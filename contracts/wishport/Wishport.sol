@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "../utils/SignatureHelper.sol";
-import "./WishSBT/IWishSBT.sol";
+import "../ERC721SoulboundMintable/IERC721SoulboundMintable.sol";
 
 library WishportError {
     string constant InvalidInterface = "WishportError:InvalidInterface";
@@ -58,7 +58,7 @@ contract Wishport is Ownable {
     // ─── Metadata ────────────────────────────────────────────────────────
 
     string public _name; // Port Name
-    IWishSBT _wishSBT; // WishSBT
+    IERC721SoulboundMintable _wishSBT; // WishSBT
     PortConfig private _config; // Port Configuration
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ contract Wishport is Ownable {
     // ─── Constructor ─────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Initialize the smartcontract
+     * @dev Initialize the smartcontract
      * @param name_ The name of the smart contract
      * @param wishSBTAddress_ The address of the wishSBT token
      * @param config_ The port configuration of the smart contract
@@ -117,13 +117,13 @@ contract Wishport is Ownable {
         PortConfig memory config_,
         SupportedERC20Config memory nativeAssetConfig_
     )
-        interfaceGuard(wishSBTAddress_, type(IWishSBT).interfaceId)
+        interfaceGuard(wishSBTAddress_, type(IERC721SoulboundMintable).interfaceId)
         portConfigGuard(config_)
         erc20ConfigGuard(nativeAssetConfig_)
     {
         _name = name_;
         _config = config_;
-        _wishSBT = IWishSBT(wishSBTAddress_);
+        _wishSBT = IERC721SoulboundMintable(wishSBTAddress_);
         _supportedERC20Configs[NATIVE_INDEX] = nativeAssetConfig_;
         _managers[_msgSender()] = true;
     }
@@ -180,15 +180,12 @@ contract Wishport is Ownable {
      * @param account_ The target address for validation
      * @param nonce_ the target nonce to validate
      * ! Requirements:
-     * ! The nonce_ must be available corresponding to account_
+     * ! The nonce_ of account_ must not been consumed yet
      * * Operations:
      * * Update the nonce_ corresponding to account_ to True after all operations have completed
      */
     modifier nonceGuard(uint256 nonce_, address account_) {
-        require(
-            nonceAvailability(account_, nonce_),
-            WishportError.InvalidNonce
-        );
+        require(!nonce(account_, nonce_), WishportError.InvalidNonce);
 
         _;
 
@@ -243,7 +240,7 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev [Assets Management] Return the outstanding balance of an account
+     * @dev [Assets Management] Get the outstanding balance of an account
      * @param assetId_ The target AssetId
      * @param account_ The target account
      * @return {Account Balance}
@@ -259,7 +256,7 @@ contract Wishport is Ownable {
     // ─── Public Functions ────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Return the port config
+     * @dev [Metadata] Get the port config
      * @return {Port Config}
      */
     function config() public view returns (PortConfig memory) {
@@ -267,7 +264,7 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev [Access Right Management] Return the manager status of an account
+     * @dev [Access Right Management] Get the manager status of an account
      * @param account_ The target account
      * @return {Manager Status} TRUE as account_ being a manager, FALSE as account_ not a manager
      */
@@ -276,7 +273,7 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev [Assets Management] Return the address of the supported ERC20 of the corresponding AssetId
+     * @dev [Assets Management] Get the address of the supported ERC20 of the corresponding AssetId
      * @param assetId_ The target AssetId
      * @return {Supported ERC20 Address}
      */
@@ -285,7 +282,7 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev [Assets Management] Return the configuation of the supported ERC20 of the corresponding AssetId
+     * @dev [Assets Management] Get the configuation of the supported ERC20 of the corresponding AssetId
      * @param assetId_ The target AssetId
      * @return {Supported ERC20 Configuration}
      */
@@ -305,23 +302,23 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev [Access Right Management] Return the availability of a nonce under an account
+     * @dev [Access Right Management] Get the consumption status of a nonce under an account
      * @param account_ The target account
      * @param nonce_ The target nonce
-     * @return {Nonce Availability} TRUE as nonce_ available to consume for account_, FALSE as nonce_ has already been consumed by account_
+     * @return {Consumption Status} TRUE as nonce_ of account_ has been consumed, and FALSE otherwise
      */
-    function nonceAvailability(
+    function nonce(
         address account_,
         uint256 nonce_
     ) public view returns (bool) {
-        return !_nonces[account_][nonce_];
+        return _nonces[account_][nonce_];
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── External Functions ──────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Return the address of wishSBT token
+     * @dev [Metadata] Get the address of wishSBT token
      * @return {WishSBT Address}
      */
     function wishSBT() external view returns (address) {

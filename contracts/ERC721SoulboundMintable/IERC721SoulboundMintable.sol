@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "../../sbt/ERC721SoulBound/IERC721SoulBound.sol";
-
-// import "hardhat/console.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@dooot/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 // conditional soul bound
-interface IWishSBT is IERC721SoulBound {
+interface IERC721SoulboundMintable is IERC721Soulbound {
     /**
      * @dev mint the token
      *
@@ -36,8 +37,7 @@ interface IWishSBT is IERC721SoulBound {
      * - only owner or soul verifiers can mint to address
      * - token has to be minted
      */
-    function setTransferable(
-        uint256 tokenId_,
-        bool status_
-    ) external returns (bool);
+    function setTransferable(uint256 tokenId_, bool status_)
+        external
+        returns (bool);
 }
