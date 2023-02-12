@@ -3,28 +3,35 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@dooot/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
+import "@dyut6/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./IERC721SoulboundMintable.sol";
+import "./IWishERC721Soulbound.sol";
+
+library WishERC721SoulboundError {
+    string constant SetTransferableError =
+        "WishERC721Soulbound:SetTransferableError";
+    string constant UnauthorizedError = "WishERC721Soulbound:Unauthorized";
+}
 
 // conditional soul bound
-contract ERC721SoulboundMintable is
+contract WishERC721Soulbound is
     ERC721Soulbound,
     ERC721Pausable,
     ERC721Enumerable,
-    IERC721SoulboundMintable
+    IWishERC721Soulbound
 {
     // ─── Events ──────────────────────────────────────────────────────────────────
 
     event Mint(address indexed to_, uint256 indexed tokenId_);
     event Burn(uint256 indexed tokenId_);
-    event SetTransferrable(uint256 indexed tokenId_, bool status);
+    event SetTransferable(uint256 indexed tokenId_, bool status);
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Metadata ────────────────────────────────────────────────────────
 
     string private _uri; // baseURI of the ERC721 metadata
+    address _wishport; // address of the wishport controller
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Variables ───────────────────────────────────────────────────────────────
@@ -33,6 +40,7 @@ contract ERC721SoulboundMintable is
      *  Token Management
      */
     mapping(uint256 => bool) _transferable; // Mapping from tokenId to transferable status, if true then transferable
+    mapping(address => uint256) _balanceOfTransferable; // Mapping from address to transferable token balance
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constructor ─────────────────────────────────────────────────────────────
@@ -55,6 +63,17 @@ contract ERC721SoulboundMintable is
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // ─── Modifiers ───────────────────────────────────────────────────────
+
+    /**
+     * @dev [Metadata] Ensure the message sender is the wishport
+     */
+    modifier onlyWishport() {
+        require(_msgSender() == _wishport);
+        _;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // ─── Internal Functions ──────────────────────────────────────────────────────
 
     /**
@@ -67,6 +86,10 @@ contract ERC721SoulboundMintable is
         return _uri;
     }
 
+    function transferable(uint256 tokenId_) public view returns (bool) {
+        return _transferable[tokenId_];
+    }
+
     function _checkTokenTransferEligibility(
         address from_,
         address to_,
@@ -74,11 +97,11 @@ contract ERC721SoulboundMintable is
     ) internal view virtual override returns (bool) {
         // if its minting || burning: must be soul verifier or owner
         if (from_ == address(0) || to_ == address(0)) {
-            return _checkOwnerOrSoulhubAdministrator(_msgSender());
+            return (_msgSender() == _wishport);
         }
 
         // only allow not locked tokens to be transferred under same soul
-        return _transferable[tokenId_] && _checkSameSoul(from_, to_);
+        return transferable(tokenId_) && _checkSameSoul(from_, to_);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -110,20 +133,50 @@ contract ERC721SoulboundMintable is
         _unpause();
     }
 
+    function balanceOfTransferable(address account_)
+        public
+        view
+        returns (uint256)
+    {
+        return _balanceOfTransferable[account_];
+    }
+
     /**
      * @dev Returns all the tokens owned by an address
      */
-    function tokensOfOwner(address a_)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function tokensOfOwner(address a_) public view returns (uint256[] memory) {
         uint256 ownerTokenCount = balanceOf(a_);
 
         uint256[] memory ownedTokens = new uint256[](ownerTokenCount);
 
         for (uint256 i = 0; i < ownerTokenCount; i++) {
             ownedTokens[i] = tokenOfOwnerByIndex(a_, i);
+        }
+
+        return ownedTokens;
+    }
+
+    /**
+     * @dev Returns all the tokens owned by an address
+     */
+    function tokensOfOwner(address a_, bool transferable_)
+        external
+        view
+        returns (uint256[] memory)
+    {
+        uint256 ownerTokenCount = balanceOf(a_);
+        uint256 ownerTransferableTokenCount = balanceOfTransferable(a_);
+
+        uint256[] memory ownedTokens = new uint256[](
+            transferable_
+                ? ownerTransferableTokenCount
+                : ownerTokenCount - ownerTransferableTokenCount
+        );
+
+        for (uint256 i = 0; i < ownerTokenCount; i++) {
+            if (transferable(ownedTokens[i]) == transferable_) {
+                ownedTokens[i] = tokenOfOwnerByIndex(a_, i);
+            }
         }
 
         return ownedTokens;
@@ -140,7 +193,7 @@ contract ERC721SoulboundMintable is
     function mint(address to_, uint256 tokenId_)
         external
         whenNotPaused
-        onlyOwnerOrSoulhubAdministrator
+        onlyWishport
         returns (bool)
     {
         _mint(to_, tokenId_);
@@ -159,7 +212,7 @@ contract ERC721SoulboundMintable is
     function burn(uint256 tokenId_)
         external
         whenNotPaused
-        onlyOwnerOrSoulhubAdministrator
+        onlyWishport
         returns (bool)
     {
         _burn(tokenId_);
@@ -178,12 +231,23 @@ contract ERC721SoulboundMintable is
     function setTransferable(uint256 tokenId_, bool status_)
         external
         whenNotPaused
-        onlyOwnerOrSoulhubAdministrator
+        onlyWishport
         returns (bool)
     {
         _requireMinted(tokenId_);
+        require(
+            _transferable[tokenId_] != status_,
+            WishERC721SoulboundError.SetTransferableError
+        );
+        // if set true, increment the owner transferable balance
+        // else decrement the owner transferable balance
+        if (status_) {
+            _balanceOfTransferable[ownerOf(tokenId_)] += 1;
+        } else {
+            _balanceOfTransferable[ownerOf(tokenId_)] -= 1;
+        }
         _transferable[tokenId_] = status_;
-        emit SetTransferrable(tokenId_, status_);
+        emit SetTransferable(tokenId_, status_);
         return true;
     }
 
@@ -204,6 +268,15 @@ contract ERC721SoulboundMintable is
         override(ERC721Pausable, ERC721Enumerable, ERC721Soulbound)
     {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
+        // if token is transferable, update the transferable balance
+        if (transferable(tokenId_)) {
+            if (from_ != address(0)) {
+                _balanceOfTransferable[from_] -= 1;
+            }
+            if (to_ != address(0)) {
+                _balanceOfTransferable[to_] += 1;
+            }
+        }
     }
 
     /**
@@ -217,7 +290,7 @@ contract ERC721SoulboundMintable is
         returns (bool)
     {
         return
-            interfaceId_ == type(IERC721SoulboundMintable).interfaceId ||
+            interfaceId_ == type(IWishERC721Soulbound).interfaceId ||
             super.supportsInterface(interfaceId_);
     }
 

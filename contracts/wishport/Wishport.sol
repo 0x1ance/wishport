@@ -6,13 +6,17 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/SignatureHelper.sol";
 import "../ERC721SoulboundMintable/IERC721SoulboundMintable.sol";
 
 library WishportError {
     string constant InvalidInterface = "WishportError:InvalidInterface";
     string constant ERC20TransferError = "WishportError:ERC20TransferError";
+    string constant ERC721SoulboundMintError =
+        "WishportError:ERC721SoulboundMintError";
     string constant InvalidAsset = "WishportError:InvalidAsset";
     string constant InvalidPortion = "WishportError:InvalidPortion";
     string constant InvalidAddress = "WishportError:InvalidAddress";
@@ -55,10 +59,12 @@ struct Wish {
 }
 
 contract Wishport is Ownable {
+    using SafeERC20 for IERC20;
+    using Address for address;
     // ─── Metadata ────────────────────────────────────────────────────────
 
     string public _name; // Port Name
-    IERC721SoulboundMintable _wishSBT; // WishSBT
+    IERC721SoulboundMintable _wishToken; // wishToken
     PortConfig private _config; // Port Configuration
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -97,33 +103,36 @@ contract Wishport is Ownable {
     /**
      * @dev Initialize the smartcontract
      * @param name_ The name of the smart contract
-     * @param wishSBTAddress_ The address of the wishSBT token
+     * @param wishTokenAddress_ The address of the wishToken token
      * @param config_ The port configuration of the smart contract
      * @param nativeAssetConfig_ The asset configuration of the native ether of deployed chain
      * ! Requirements:
-     * ! Input wishSBTAddress_ must pass the validation of interfaceGuard corresponding to the IWishSBT interface
+     * ! Input wishTokenAddress_ must pass the validation of interfaceGuard corresponding to the IwishToken interface
      * ! Input config_ must pass the validation of portConfigGuard
      * ! Input nativeAssetConfig_ must pass the validation of erc20ConfigGuard
      * * Operations:
      * * Initialize the _name metadata
      * * Initialize the _config metadata
-     * * Initialize the _wishSBT metadata
+     * * Initialize the _wishToken metadata
      * * Initialize the _supportedERC20Configs of NATIVE_INDEX
      * * Initialize the manager status of deployer
      */
     constructor(
         string memory name_,
-        address wishSBTAddress_,
+        address wishTokenAddress_,
         PortConfig memory config_,
         SupportedERC20Config memory nativeAssetConfig_
     )
-        interfaceGuard(wishSBTAddress_, type(IERC721SoulboundMintable).interfaceId)
+        interfaceGuard(
+            wishTokenAddress_,
+            type(IERC721SoulboundMintable).interfaceId
+        )
         portConfigGuard(config_)
         erc20ConfigGuard(nativeAssetConfig_)
     {
         _name = name_;
         _config = config_;
-        _wishSBT = IERC721SoulboundMintable(wishSBTAddress_);
+        _wishToken = IERC721SoulboundMintable(wishTokenAddress_);
         _supportedERC20Configs[NATIVE_INDEX] = nativeAssetConfig_;
         _managers[_msgSender()] = true;
     }
@@ -245,10 +254,11 @@ contract Wishport is Ownable {
      * @param account_ The target account
      * @return {Account Balance}
      */
-    function _accountBalance(
-        uint256 assetId_,
-        address account_
-    ) internal view returns (uint256) {
+    function _accountBalance(uint256 assetId_, address account_)
+        internal
+        view
+        returns (uint256)
+    {
         return _accountBalances[assetId_][account_];
     }
 
@@ -286,9 +296,11 @@ contract Wishport is Ownable {
      * @param assetId_ The target AssetId
      * @return {Supported ERC20 Configuration}
      */
-    function supportedERC20Config(
-        uint256 assetId_
-    ) public view returns (SupportedERC20Config memory) {
+    function supportedERC20Config(uint256 assetId_)
+        public
+        view
+        returns (SupportedERC20Config memory)
+    {
         return _supportedERC20Configs[assetId_];
     }
 
@@ -307,10 +319,11 @@ contract Wishport is Ownable {
      * @param nonce_ The target nonce
      * @return {Consumption Status} TRUE as nonce_ of account_ has been consumed, and FALSE otherwise
      */
-    function nonce(
-        address account_,
-        uint256 nonce_
-    ) public view returns (bool) {
+    function nonce(address account_, uint256 nonce_)
+        public
+        view
+        returns (bool)
+    {
         return _nonces[account_][nonce_];
     }
 
@@ -318,11 +331,11 @@ contract Wishport is Ownable {
     // ─── External Functions ──────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Get the address of wishSBT token
-     * @return {WishSBT Address}
+     * @dev [Metadata] Get the address of wishToken token
+     * @return {wishToken Address}
      */
-    function wishSBT() external view returns (address) {
-        return address(_wishSBT);
+    function wishToken() external view returns (address) {
+        return address(_wishToken);
     }
 
     /**
@@ -334,9 +347,11 @@ contract Wishport is Ownable {
      * * Operations:
      * * Update the port config with config_
      */
-    function setConfig(
-        PortConfig memory config_
-    ) external onlyOwner portConfigGuard(config_) {
+    function setConfig(PortConfig memory config_)
+        external
+        onlyOwner
+        portConfigGuard(config_)
+    {
         _config = config_;
     }
 
@@ -345,9 +360,11 @@ contract Wishport is Ownable {
      * @param assetId_ The target AssetId
      * @return {Balance of Reward Pool}
      */
-    function rewardPoolBalance(
-        uint256 assetId_
-    ) external view returns (uint256) {
+    function rewardPoolBalance(uint256 assetId_)
+        external
+        view
+        returns (uint256)
+    {
         return _rewardPools[assetId_];
     }
 
@@ -361,10 +378,10 @@ contract Wishport is Ownable {
      * * Operations:
      * * Update the port config with config_
      */
-    function setManagerStatus(
-        address account_,
-        bool status_
-    ) external onlyOwner {
+    function setManagerStatus(address account_, bool status_)
+        external
+        onlyOwner
+    {
         _checkAddress(account_);
         _managers[account_] = status_;
     }
@@ -383,10 +400,7 @@ contract Wishport is Ownable {
      * * Assign asset_ into _supportedERC20s with the index of the incremented _supportedERC20Count
      * * Assign config_ into _supportedERC20Configs with the index of the incremented _supportedERC20Count
      */
-    function registerERC20(
-        address asset_,
-        SupportedERC20Config memory config_
-    )
+    function registerERC20(address asset_, SupportedERC20Config memory config_)
         external
         onlyOwner
         interfaceGuard(asset_, type(IERC20).interfaceId)
@@ -420,32 +434,44 @@ contract Wishport is Ownable {
         SupportedERC20Config memory assetConfig = supportedERC20Config(
             assetId_
         );
+        uint256 finalAmount_;
         require(
             assetAmount_ >= assetConfig.MINIMUM_REWARD,
             WishportError.InvalidAsset
         );
         if (assetId_ == NATIVE_INDEX) {
             require(msg.value == assetAmount_, WishportError.InvalidAsset);
+            finalAmount_ = assetAmount_;
         } else {
             address targetERC20Address = supportedERC20(assetId_);
             require(
                 targetERC20Address != address(0),
                 WishportError.InvalidAsset
             );
+            uint256 balanceBefore = IERC20(targetERC20Address).balanceOf(
+                address(this)
+            );
+
+            IERC20(targetERC20Address).safeTransferFrom(
+                _msgSender(),
+                address(this),
+                assetAmount_
+            );
+
+            uint256 balanceAfter = IERC20(targetERC20Address).balanceOf(
+                address(this)
+            );
             require(
-                IERC20(targetERC20Address).transferFrom(
-                    _msgSender(),
-                    address(this),
-                    assetAmount_
-                ),
+                balanceAfter >= balanceBefore,
                 WishportError.ERC20TransferError
             );
+            finalAmount_ = balanceAfter - balanceBefore;
         }
 
         _;
 
-        _rewardPools[assetId_] += assetAmount_;
-        _accountBalances[assetId_][_msgSender()] += assetAmount_;
+        _rewardPools[assetId_] += finalAmount_;
+        _accountBalances[assetId_][_msgSender()] += finalAmount_;
     }
 
     /**
@@ -459,7 +485,7 @@ contract Wishport is Ownable {
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
      * ! Input sig_ must pass the validation of managerSignatureGuard
      * ! Input assetId_ & assetAmount_ must pass the validation of mintWishAssetGuard
-     * ! Input tokenId_ must not have corressponding minter record or being minted in wishSBT token contract
+     * ! Input tokenId_ must not have corressponding minter record or being minted in wishToken token contract
      * * Operations:
      * * Create the corresponding wish information
      * * Update the mintedWishes in the wish history of _msgSender() with tokenId_
@@ -492,11 +518,20 @@ contract Wishport is Ownable {
         mintWishAssetGuard(assetId_, assetAmount_)
     {
         Wish storage _currentWish = _wishes[tokenId_];
-        require(
-            _currentWish.minter == address(0) &&
-                _wishSBT.mint(_msgSender(), tokenId_),
-            WishportError.InvalidWish
+        require(_currentWish.minter == address(0), WishportError.InvalidWish);
+
+        bytes memory returndata = address(_wishToken).functionCall(
+            abi.encodeWithSelector(
+                _wishToken.mint.selector,
+                _msgSender(),
+                tokenId_
+            )
         );
+        require(
+            returndata.length > 0 && abi.decode(returndata, (bool)),
+            WishportError.ERC721SoulboundMintError
+        );
+
         _currentWish.status = WishStatusEnum.OUTSTANDING;
         _currentWish.minter = _msgSender();
         _currentWish.assetId = assetId_;
@@ -574,4 +609,7 @@ contract Wishport is Ownable {
         ] = tokenId_;
     }
     // ─────────────────────────────────────────────────────────────────────
+    // update fulfillment (confirm or cancel)
+    // burn wish
+    // handle dispute
 }
