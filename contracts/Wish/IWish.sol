@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
-
-import "@dyut6/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 // conditional soul bound
-interface IWishERC721Soulbound is IERC721Soulbound {
+interface IWish is IERC721 {
     /**
      * @dev mint the token
      *

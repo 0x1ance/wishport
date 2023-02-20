@@ -6,21 +6,15 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@dyut6/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./IWishERC721Soulbound.sol";
+import "./IWish.sol";
 
-library WishERC721SoulboundError {
-    string constant SetTransferableError =
-        "WishERC721Soulbound:SetTransferableError";
-    string constant UnauthorizedError = "WishERC721Soulbound:Unauthorized";
+library WishError {
+    string constant SetTransferableError = "Wish:SetTransferableError";
+    string constant UnauthorizedError = "Wish:Unauthorized";
 }
 
 // conditional soul bound
-contract WishERC721Soulbound is
-    ERC721Soulbound,
-    ERC721Pausable,
-    ERC721Enumerable,
-    IWishERC721Soulbound
-{
+contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     // ─── Events ──────────────────────────────────────────────────────────────────
 
     event Mint(address indexed to_, uint256 indexed tokenId_);
@@ -57,9 +51,11 @@ contract WishERC721Soulbound is
         string memory name_,
         string memory symbol_,
         string memory uri_,
-        address soulhub_
+        address soulhub_,
+        address wishport_
     ) ERC721Soulbound(name_, symbol_, soulhub_) {
         _uri = uri_;
+        _wishport = wishport_;
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -75,6 +71,10 @@ contract WishERC721Soulbound is
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Internal Functions ──────────────────────────────────────────────────────
+
+    function wishport() public view returns (address) {
+        return _wishport;
+    }
 
     /**
      * @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
@@ -97,7 +97,7 @@ contract WishERC721Soulbound is
     ) internal view virtual override returns (bool) {
         // if its minting || burning: must be soul verifier or owner
         if (from_ == address(0) || to_ == address(0)) {
-            return (_msgSender() == _wishport);
+            return (_msgSender() == wishport());
         }
 
         // only allow not locked tokens to be transferred under same soul
@@ -109,6 +109,10 @@ contract WishERC721Soulbound is
 
     function setBaseURI(string memory uri_) external onlyOwner {
         _uri = uri_;
+    }
+
+    function setWishport(address wishport_) external onlyOwner {
+        _wishport = wishport_;
     }
 
     /**
@@ -237,7 +241,7 @@ contract WishERC721Soulbound is
         _requireMinted(tokenId_);
         require(
             _transferable[tokenId_] != status_,
-            WishERC721SoulboundError.SetTransferableError
+            WishError.SetTransferableError
         );
         // if set true, increment the owner transferable balance
         // else decrement the owner transferable balance
@@ -286,11 +290,11 @@ contract WishERC721Soulbound is
         public
         view
         virtual
-        override(IERC165, ERC721, ERC721Enumerable, ERC721Soulbound)
+        override(ERC721, ERC721Enumerable, ERC721Soulbound, IERC165)
         returns (bool)
     {
         return
-            interfaceId_ == type(IWishERC721Soulbound).interfaceId ||
+            interfaceId_ == type(IWish).interfaceId ||
             super.supportsInterface(interfaceId_);
     }
 
