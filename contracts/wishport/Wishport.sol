@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/SignatureHelper.sol";
-import "../Wish/IWish.sol";
+import "../wishs/IWish.sol";
 
 library WishportError {
     string constant InvalidInterface = "Wishport:InvalidInterface";

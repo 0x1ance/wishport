@@ -41,6 +41,7 @@
     "@dyut6/soulbound": "^1.0.2",
     "@ethersproject/bignumber": "^5.7.0",
     "@ethersproject/bytes": "^5.0.0",
+    "@ethersproject/logger": "^5.7.0",
     "@openzeppelin/contracts": "^4.8.1",
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
     "date-fns": "^2.29.3",
