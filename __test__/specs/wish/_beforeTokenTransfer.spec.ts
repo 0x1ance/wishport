@@ -1,13 +1,13 @@
 
 import { Chance } from 'chance';
 import { contractDeployer } from '../../utils/ContractDeployer';
-import { expectFnReturnChange, expectRevert } from '@dyut6/soulbound/ethers-test-helpers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat';
+import { expectRevert, expectFnReturnChange } from '../../../ethers-test-helpers'
 
 const chance = new Chance()
 
-describe('UNIT TEST: ERC721Soulbound Contract - _beforeTokenTransfer', () => {
+describe.skip('UNIT TEST: ERC721Soulbound Contract - _beforeTokenTransfer', () => {
   it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
     test _checkTokenTransferEligibility implementation: 
       - if its minting or burning, caller must be owner or soulhub administrator

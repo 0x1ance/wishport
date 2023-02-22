@@ -17,8 +17,6 @@ library WishError {
 contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     // ─── Events ──────────────────────────────────────────────────────────────────
 
-    event Mint(address indexed to_, uint256 indexed tokenId_);
-    event Burn(uint256 indexed tokenId_);
     event SetTransferable(uint256 indexed tokenId_, bool status);
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +63,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
      * @dev [Metadata] Ensure the message sender is the wishport
      */
     modifier onlyWishport() {
-        require(_msgSender() == _wishport);
+        require(_msgSender() == _wishport, WishError.UnauthorizedError);
         _;
     }
 
@@ -201,7 +199,6 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
         returns (bool)
     {
         _mint(to_, tokenId_);
-        emit Mint(to_, tokenId_);
         return true;
     }
 
@@ -220,7 +217,6 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
         returns (bool)
     {
         _burn(tokenId_);
-        emit Burn(tokenId_);
         return true;
     }
 

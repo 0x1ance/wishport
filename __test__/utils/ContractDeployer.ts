@@ -4,7 +4,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import Chance from 'chance'
 import { LogLevel } from '@ethersproject/logger'
 import { SoulhubManager, Soulbound, Soulhub, Wish, Wishport } from '../../types';
-import { ZERO_ADDRESS } from '@dyut6/soulbound/ethers-test-helpers/consts'
+import { ZERO_ADDRESS } from '../../ethers-test-helpers'
 
 ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
 const chance = new Chance()
@@ -29,7 +29,7 @@ type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConf
     name?: string,
     symbol?: string,
     uri?: string,
-    wishport?: Wishport
+    wishportAddress?: string
 }
 
 class ContractDeployer {
@@ -87,7 +87,7 @@ class ContractDeployer {
         ]
     }
     async Wish(
-        { owner, manager, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), soulhub, wishport }: WishDeploymentConfig = {}
+        { owner, manager, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), soulhub, wishportAddress }: WishDeploymentConfig = {}
     ) {
         const [defaultOwner] = await ethers.getSigners()
         const targetOwner = owner ?? defaultOwner
@@ -101,7 +101,7 @@ class ContractDeployer {
             symbol,
             uri,
             targetSoulhub.address,
-            wishport ? wishport.address : ZERO_ADDRESS
+            wishportAddress ?? ZERO_ADDRESS
         )
         return [wish, targetSoulhub, targetSoulhubManager, targetOwner] as [
             Wish,

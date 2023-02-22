@@ -1,7 +1,7 @@
 lockfileVersion: 5.4
 
 specifiers:
-  '@dyut6/soulbound': ^1.0.2
+  '@dyut6/soulbound': ^1.0.3
   '@ethersproject/abi': ^5.7.0
   '@ethersproject/bignumber': ^5.7.0
   '@ethersproject/bytes': ^5.0.0
@@ -39,7 +39,7 @@ specifiers:
   typescript: ^4.9.4
 
 dependencies:
-  '@dyut6/soulbound': 1.0.2
+  '@dyut6/soulbound': 1.0.3
   '@ethersproject/bignumber': 5.7.0
   '@ethersproject/bytes': 5.7.0
   '@ethersproject/logger': 5.7.0
@@ -87,8 +87,8 @@ packages:
       '@jridgewell/trace-mapping': 0.3.9
     dev: true
 
-  /@dyut6/soulbound/1.0.2:
-    resolution: {integrity: sha512-AUHzRkUROlhkYRJE1YJsuRcdWtzCBLZy263K3lUcGQw9DG/j+6MtNaJ4CT6C/pWx8Q9cMDOtI0Udy8fdwtPZOQ==}
+  /@dyut6/soulbound/1.0.3:
+    resolution: {integrity: sha512-HgaihUhq2EEqCWBrEPLAwvpi8zNCgIpHgqgK6AnKVSt9tZumqGJoXueyfuH1Ujvie2qHNjQ5axqoFFBLrZ6whg==}
     requiresBuild: true
     dependencies:
       '@ethersproject/bignumber': 5.7.0
