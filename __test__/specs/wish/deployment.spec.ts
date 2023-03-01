@@ -9,7 +9,7 @@ import { generateInterfaceID, expectRevert } from '../../../ethers-test-helpers'
 
 const chance = new Chance()
 
-describe.skip('UNIT TEST: Wish Contract - deployment', () => {
+describe('UNIT TEST: Wish Contract - deployment', () => {
   it('deployment: should support the IERC164, ISoulbound, IERC721, IERC721Soulbound & IWish interface', async () => {
     const [wish] = await contractDeployer.Wish()
 

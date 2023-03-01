@@ -7,7 +7,7 @@ import { ethers } from 'hardhat';
 
 const chance = new Chance()
 
-describe.skip('UNIT TEST: Wish Contract - balanceOfSoul', () => {
+describe('UNIT TEST: Wish Contract - balanceOfSoul', () => {
   it(`balanceOfSoul: should update when the balance of soul members changes
 `, async () => {
     const [owner, accountA, accountB] = await ethers.getSigners()
