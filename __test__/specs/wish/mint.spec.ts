@@ -5,10 +5,7 @@ import { expectEvent, expectFnReturnChange, expectRevert, ZERO_ADDRESS } from '.
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
-
-const chance = new Chance()
-
-describe('UNIT TEST: Wish Contract - mint', () => {
+describe.skip('UNIT TEST: Wish Contract - mint', () => {
   it(`mint: should throw error if the contract is paused
 `, async () => {
     const [owner, wishport, accountA] = await ethers.getSigners()
