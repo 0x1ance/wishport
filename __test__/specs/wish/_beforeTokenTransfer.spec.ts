@@ -1,163 +1,60 @@
-
-import { Chance } from 'chance';
 import { contractDeployer } from '../../utils/ContractDeployer';
-import { expect } from 'chai'
+import {  expectFnReturnChange } from '../../../ethers-test-helpers'
 import { ethers } from 'hardhat';
-import { expectRevert, expectFnReturnChange } from '../../../ethers-test-helpers'
+import { expect } from 'chai';
 
-const chance = new Chance()
-
-describe.skip('UNIT TEST: ERC721Soulbound Contract - _beforeTokenTransfer', () => {
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-    test _checkTokenTransferEligibility implementation: 
-      - if its minting or burning, caller must be owner or soulhub administrator
-      - if its transfering, tokenId must not be locked
-      - if its transfering, from_ and to_ should share the same soul
-    should throw error if the minter is not either owner or soulhub administrator
-  `, async () => {
-    const [owner, nonOwner] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
-
-    await expectRevert(
-      wish.connect(nonOwner).mint(nonOwner.address, 0),
-      'Soulbound:NotOwnerOrSoulhubAdministrator'
-    )
-  })
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-    test implementation: 
-      - if its minting or burning, caller must be owner or soulhub administrator
-      - if its transfering, tokenId must not be locked
-      - if its transfering, from_ and to_ should share the same soul
-    should mint a token if the minter is owner
-  `, async () => {
-    const [owner, account] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
-
-    await expectFnReturnChange(
-      wish.connect(owner).mint,
-      [account.address, 0],
-      {
-        contract: wish,
-        functionSignature: 'balanceOf',
-        params: [account.address,],
-        expectedBefore: 0,
-        expectedAfter: 1
-      },
-    )
-  })
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-    test implementation: 
-      - if its minting or burning, caller must be owner or soulhub administrator
-      - if its transfering, tokenId must not be locked
-      - if its transfering, from_ and to_ should share the same soul
-    should mint a token if the minter is a soulhub administrator
-  `, async () => {
-    const [owner, admin, account] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub, soulhubManager] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
-
-    await soulhubManager.connect(owner).setAdministratorStatus(admin.address, true)
-
-    await expectFnReturnChange(
-      wish.connect(admin).mint,
-      [account.address, 0],
-      {
-        contract: wish,
-        functionSignature: 'balanceOf',
-        params: [account.address,],
-        expectedBefore: 0,
-        expectedAfter: 1
-      },
-    )
-  })
-
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-  test implementation: 
-    - if its minting or burning, caller must be owner or soulhub administrator
-    - if its transfering, tokenId must not be locked
-    - if its transfering, from_ and to_ should share the same soul
-  should transfer a token between account under same soul
+describe('UNIT TEST: Wish Contract - _beforeTokenTransfer', () => {
+  it(`_beforeTokenTransfer: should decrement prev owner balanceOfTransferable
 `, async () => {
-    const [owner, sender, receiver] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
+    const [owner, wishport, account, accountB] = await ethers.getSigners()
+    const [wish, soulhub, soulhubManager] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const tokenId = 0
+    const soul = 1
+    await wish.connect(wishport).mint(account.address, tokenId)
+    await wish.connect(wishport).setTransferable(tokenId, true);
+    await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
+    await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
-    await soulhub.connect(owner)['setSoul(address,uint256)'](sender.address, 1)
-    await soulhub.connect(owner)['setSoul(address,uint256)'](receiver.address, 1)
-    await wish.connect(owner).mint(sender.address, 0)
+    expect(await wish.transferable(tokenId)).to.be.true
+    expect(await soulhub.sameSoul(account.address, accountB.address)).to.be.true
 
-    const receiverBalanceBefore = (await wish.connect(receiver).balanceOf(receiver.address)).toNumber()
     await expectFnReturnChange(
-      wish.connect(sender).transferFrom,
-      [sender.address, receiver.address, 0],
+      wish.connect(account).transferFrom,
+      [account.address, accountB.address, tokenId],
       {
         contract: wish,
-        functionSignature: 'balanceOf',
-        params: [sender.address,],
+        functionSignature: 'balanceOfTransferable',
+        params: [account.address],
         expectedBefore: 1,
         expectedAfter: 0
       },
     )
-    const receiverBalanceAfter = (await wish.connect(receiver).balanceOf(receiver.address)).toNumber()
-
-    expect(receiverBalanceBefore).to.equal(0)
-    expect(receiverBalanceAfter).to.equal(1)
   })
-
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-  test implementation: 
-    - if its minting or burning, caller must be owner or soulhub administrator
-    - if its transfering, tokenId must not be locked
-    - if its transfering, from_ and to_ should share the same soul
-  should throw error if the tokenId is locked
+  it(`_beforeTokenTransfer: should increment new owner balanceOfTransferable
 `, async () => {
-    const [owner, sender, receiver] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
+    const [owner, wishport, account, accountB] = await ethers.getSigners()
+    const [wish, soulhub] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
 
-    await soulhub.connect(owner)['setSoul(address,uint256)'](sender.address, 1)
-    await soulhub.connect(owner)['setSoul(address,uint256)'](receiver.address, 1)
-    await wish.connect(owner).mint(sender.address, 0)
-    await wish.connect(owner).setTransferable(0, true)
+    const tokenId = 0
+    const soul = 1
+    await wish.connect(wishport).mint(account.address, tokenId)
+    await wish.connect(wishport).setTransferable(tokenId, true);
+    await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
+    await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
-    await expectRevert(
-      wish.connect(sender).transferFrom(sender.address, receiver.address, 0),
-      'ERC721Soulbound:Unauthorized'
-    )
-  })
+    expect(await wish.transferable(tokenId)).to.be.true
+    expect(await soulhub.sameSoul(account.address, accountB.address)).to.be.true
 
-  it(`_beforeTokenTransfer: should check _checkTokenTransferEligibility before token transfer
-  test implementation: 
-    - if its minting or burning, caller must be owner or soulhub administrator
-    - if its transfering, tokenId must not be locked
-    - if its transfering, from_ and to_ should share the same soul
-  should throw error if the from_ and to_ doesnt share the same soul
-`, async () => {
-    const [owner, sender, receiver] = await ethers.getSigners()
-    const name = chance.word({ length: 10 })
-    const symbol = chance.word({ length: 5 })
-    const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol })
-
-    await soulhub.connect(owner)['setSoul(address,uint256)'](sender.address, 1)
-    await soulhub.connect(owner)['setSoul(address,uint256)'](receiver.address, 2)
-    await wish.connect(owner).mint(sender.address, 0)
-
-    await expectRevert(
-      wish.connect(sender).transferFrom(sender.address, receiver.address, 0),
-      'ERC721Soulbound:Unauthorized'
+    await expectFnReturnChange(
+      wish.connect(account).transferFrom,
+      [account.address, accountB.address, tokenId],
+      {
+        contract: wish,
+        functionSignature: 'balanceOfTransferable',
+        params: [accountB.address],
+        expectedBefore: 0,
+        expectedAfter: 1
+      },
     )
   })
 })

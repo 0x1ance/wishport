@@ -269,13 +269,12 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
         // if token is transferable, update the transferable balance
-        if (transferable(tokenId_)) {
-            if (from_ != address(0)) {
-                _balanceOfTransferable[from_] -= 1;
-            }
-            if (to_ != address(0)) {
-                _balanceOfTransferable[to_] += 1;
-            }
+
+        if (from_ != address(0) && transferable(tokenId_)) {
+            _balanceOfTransferable[from_] -= 1;
+        }
+        if (to_ != address(0) && transferable(tokenId_)) {
+            _balanceOfTransferable[to_] += 1;
         }
     }
 
