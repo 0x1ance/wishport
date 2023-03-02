@@ -7,7 +7,7 @@ describe('UNIT TEST: Wish Contract - _beforeTokenTransfer', () => {
   it(`_beforeTokenTransfer: should decrement prev owner balanceOfTransferable
 `, async () => {
     const [owner, wishport, account, accountB] = await ethers.getSigners()
-    const [wish, soulhub, soulhubManager] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [wish, soulhub] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
     const tokenId = 0
     const soul = 1
     await wish.connect(wishport).mint(account.address, tokenId)

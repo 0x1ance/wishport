@@ -162,22 +162,27 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
      * @dev Returns all the tokens owned by an address
      */
     function tokensOfOwner(address a_, bool transferable_)
-        external
+        public
         view
         returns (uint256[] memory)
     {
         uint256 ownerTokenCount = balanceOf(a_);
         uint256 ownerTransferableTokenCount = balanceOfTransferable(a_);
 
-        uint256[] memory ownedTokens = new uint256[](
-            transferable_
-                ? ownerTransferableTokenCount
-                : ownerTokenCount - ownerTransferableTokenCount
-        );
+        uint256 tokenCount = transferable_
+            ? ownerTransferableTokenCount
+            : (ownerTokenCount - ownerTransferableTokenCount);
 
+        uint256[] memory ownedTokens = new uint256[](tokenCount);
+
+        uint256 counter = 0;
         for (uint256 i = 0; i < ownerTokenCount; i++) {
-            if (transferable(ownedTokens[i]) == transferable_) {
-                ownedTokens[i] = tokenOfOwnerByIndex(a_, i);
+            uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
+            if (transferable(currentTokenId) == transferable_) {
+                ownedTokens[counter++] = currentTokenId;
+            }
+            if (counter >= tokenCount) {
+                break;
             }
         }
 
