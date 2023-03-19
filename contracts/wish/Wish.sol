@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@dyut6/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -11,10 +10,11 @@ import "./IWish.sol";
 library WishError {
     string constant SetTransferableError = "Wish:SetTransferableError";
     string constant UnauthorizedError = "Wish:Unauthorized";
+    string constant InvalidAddress = "Wish:InvalidAddress";
 }
 
 // conditional soul bound
-contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
+contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     // ─── Events ──────────────────────────────────────────────────────────────────
 
     event SetTransferable(uint256 indexed tokenId_, bool status);
@@ -23,7 +23,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     // ─── Metadata ────────────────────────────────────────────────────────
 
     string private _uri; // baseURI of the ERC721 metadata
-    address _wishport; // address of the wishport controller
+    address public wishport; // address of the wishport contract
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Variables ───────────────────────────────────────────────────────────────
@@ -52,27 +52,27 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
         address soulhub_,
         address wishport_
     ) ERC721Soulbound(name_, symbol_, soulhub_) {
+        require(wishport_ != address(0), WishError.InvalidAddress);
         _uri = uri_;
-        _wishport = wishport_;
+        wishport = wishport_;
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Modifiers ───────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Ensure the message sender is the wishport
+     * @dev [Metadata] Ensure the message sender is the wishport contract
      */
     modifier onlyWishport() {
-        require(_msgSender() == _wishport, WishError.UnauthorizedError);
+        require(
+            _msgSender() == wishport || _msgSender() == owner(),
+            WishError.UnauthorizedError
+        );
         _;
     }
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Internal Functions ──────────────────────────────────────────────────────
-
-    function wishport() public view returns (address) {
-        return _wishport;
-    }
 
     /**
      * @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
@@ -95,7 +95,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     ) internal view virtual override returns (bool) {
         // if its minting || burning: must be soul verifier or owner
         if (from_ == address(0) || to_ == address(0)) {
-            return (_msgSender() == wishport());
+            return (_msgSender() == owner());
         }
 
         // only allow not locked tokens to be transferred under same soul
@@ -105,34 +105,12 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── external Functions ────────────────────────────────────────────────
 
-    function setBaseURI(string memory uri_) external onlyOwner {
+    function setBaseURI(string memory uri_) external onlyWishport {
         _uri = uri_;
     }
 
     function setWishport(address wishport_) external onlyOwner {
-        _wishport = wishport_;
-    }
-
-    /**
-     * @dev Pause the contract
-     *
-     * Requirements:
-     *
-     * - caller must be the owner
-     */
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /**
-     * @dev Unpause the contract
-     *
-     * Requirements:
-     *
-     * - caller must be the owner
-     */
-    function unpause() external onlyOwner {
-        _unpause();
+        wishport = wishport_;
     }
 
     function balanceOfTransferable(address account_)
@@ -199,8 +177,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
      */
     function mint(address to_, uint256 tokenId_)
         external
-        whenNotPaused
-        onlyWishport
+        onlyOwner
         returns (bool)
     {
         _mint(to_, tokenId_);
@@ -215,12 +192,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
      * - when the contract is not paused
      * - only owner or soul verifiers can mint to address
      */
-    function burn(uint256 tokenId_)
-        external
-        whenNotPaused
-        onlyWishport
-        returns (bool)
-    {
+    function burn(uint256 tokenId_) external onlyOwner returns (bool) {
         _burn(tokenId_);
         return true;
     }
@@ -235,8 +207,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
      */
     function setTransferable(uint256 tokenId_, bool status_)
         external
-        whenNotPaused
-        onlyWishport
+        onlyOwner
         returns (bool)
     {
         _requireMinted(tokenId_);
@@ -267,11 +238,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
         address to_,
         uint256 tokenId_,
         uint256 batchSize_
-    )
-        internal
-        virtual
-        override(ERC721Pausable, ERC721Enumerable, ERC721Soulbound)
-    {
+    ) internal virtual override(ERC721Enumerable, ERC721Soulbound) {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
         // if token is transferable, update the transferable balance
 
@@ -290,7 +257,7 @@ contract Wish is ERC721Soulbound, ERC721Pausable, ERC721Enumerable, IWish {
         public
         view
         virtual
-        override(ERC721, ERC721Enumerable, ERC721Soulbound, IERC165)
+        override(ERC721Enumerable, ERC721Soulbound, IERC165)
         returns (bool)
     {
         return

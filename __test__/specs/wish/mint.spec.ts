@@ -6,40 +6,27 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 describe('UNIT TEST: Wish Contract - mint', () => {
-  it(`mint: should throw error if the contract is paused
+
+  it(`mint: should throw error if the caller is not owner
 `, async () => {
-    const [owner, wishport, accountA] = await ethers.getSigners()
-    const [wish] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
-
-
-    await wish.connect(owner).pause()
-
-    expect(await wish.paused()).to.be.true
-    await expectRevert(
-      wish.connect(wishport).mint(accountA.address, 1),
-      'Pausable: paused'
-    )
-  })
-  it(`mint: should throw error if the caller is not wishport
-`, async () => {
-    const [owner, wishport, accountA] = await ethers.getSigners()
-    const [wish] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, notOwner] = await ethers.getSigners()
+    const [wish] = await contractDeployer.Wish({ owner })
 
 
     await expectRevert(
-      wish.connect(accountA).mint(accountA.address, 1),
-      'Wish:Unauthorized'
+      wish.connect(notOwner).mint(notOwner.address, 1),
+      'Ownable: caller is not the owner'
     )
   })
   it(`mint: should mint the corresponding tokenId if has not been minted previously
   `, async () => {
-    const [owner, wishport, account] = await ethers.getSigners()
-    const [wish] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, account] = await ethers.getSigners()
+    const [wish] = await contractDeployer.Wish({ owner })
 
     const tokenId = 0
 
     await expectFnReturnChange(
-      wish.connect(wishport).mint,
+      wish.connect(owner).mint,
       [account.address, tokenId],
       {
         contract: wish,
@@ -52,21 +39,21 @@ describe('UNIT TEST: Wish Contract - mint', () => {
     expect(await wish.ownerOf(tokenId)).to.equal(account.address)
   })
   it(`mint: should throw error if the tokenId has been already minted`, async () => {
-    const [owner, wishport, account] = await ethers.getSigners()
-    const [wish] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, account] = await ethers.getSigners()
+    const [wish] = await contractDeployer.Wish({ owner })
     const tokenId = 0
-    await wish.connect(wishport).mint(account.address, tokenId)
+    await wish.connect(owner).mint(account.address, tokenId)
     await expectRevert(
-      wish.connect(wishport).mint(account.address, tokenId),
+      wish.connect(owner).mint(account.address, tokenId),
       'ERC721: token already minted'
     )
   })
   it('mint: should emit a Transfer event', async () => {
-    const [owner, wishport, account] = await ethers.getSigners()
-    const [wish] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, account] = await ethers.getSigners()
+    const [wish] = await contractDeployer.Wish({ owner })
     const tokenId = 0
     await expectEvent(
-      wish.connect(wishport).mint,
+      wish.connect(owner).mint,
       [account.address, tokenId],
       {
         contract: wish,

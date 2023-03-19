@@ -15,7 +15,7 @@ type ContractDeploymentBaseConfig = {
 
 type SoulhubDeploymentConfig = ContractDeploymentBaseConfig & {
     name?: string,
-    manager?: SoulhubManager
+    soulhubManager?: SoulhubManager
 }
 
 type SoulboundDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
@@ -25,11 +25,11 @@ type SoulboundDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymen
 
 type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
     soulhub?: Soulhub
-    manager?: SoulhubManager
+    soulhubManager?: SoulhubManager
     name?: string,
     symbol?: string,
     uri?: string,
-    wishportAddress?: string
+    wishport?: string
 }
 
 class ContractDeployer {
@@ -48,13 +48,13 @@ class ContractDeployer {
         ]
     }
     async Soulhub(
-        { owner, manager, name = chance.string({ length: 8 }) }: SoulhubDeploymentConfig = {}
+        { owner, soulhubManager, name = chance.string({ length: 8 }) }: SoulhubDeploymentConfig = {}
     ) {
         const [defaultOwner] = await ethers.getSigners()
         const contractFactory = await ethers.getContractFactory('Soulhub', {
         })
         const targetOwner = owner ?? defaultOwner
-        const targetSoulhubManager = manager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
+        const targetSoulhubManager = soulhubManager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
         const soulhub = await contractFactory.connect(targetOwner).deploy(
             name,
             targetSoulhubManager.address
@@ -66,12 +66,12 @@ class ContractDeployer {
         ]
     }
     async Soulbound(
-        { owner, manager, name = chance.string({ length: 8 }), soulhub }: SoulboundDeploymentConfig = {}
+        { owner, soulhubManager, name = chance.string({ length: 8 }), soulhub }: SoulboundDeploymentConfig = {}
     ) {
         const [defaultOwner] = await ethers.getSigners()
         const targetOwner = owner ?? defaultOwner
-        const targetSoulhubManager = manager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
-        const targetSoulhub = soulhub ?? (await this.Soulhub({ owner: targetOwner, manager: targetSoulhubManager, name }))[0]
+        const targetSoulhubManager = soulhubManager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
+        const targetSoulhub = soulhub ?? (await this.Soulhub({ owner: targetOwner, soulhubManager: targetSoulhubManager, name }))[0]
 
         const contractFactory = await ethers.getContractFactory('Soulbound', {
         })
@@ -87,12 +87,12 @@ class ContractDeployer {
         ]
     }
     async Wish(
-        { owner, manager, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), soulhub, wishportAddress }: WishDeploymentConfig = {}
+        { owner, wishport, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), soulhub, soulhubManager }: WishDeploymentConfig = {}
     ) {
         const [defaultOwner] = await ethers.getSigners()
         const targetOwner = owner ?? defaultOwner
-        const targetSoulhubManager = manager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
-        const targetSoulhub = soulhub ?? (await this.Soulhub({ owner: targetOwner, manager: targetSoulhubManager, name }))[0]
+        const targetSoulhubManager = soulhubManager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
+        const targetSoulhub = soulhub ?? (await this.Soulhub({ owner: targetOwner, soulhubManager: targetSoulhubManager, name }))[0]
 
         const contractFactory = await ethers.getContractFactory('Wish', {
         })
@@ -101,7 +101,7 @@ class ContractDeployer {
             symbol,
             uri,
             targetSoulhub.address,
-            wishportAddress ?? ZERO_ADDRESS
+            wishport ?? targetOwner.address
         )
         return [wish, targetSoulhub, targetSoulhubManager, targetOwner] as [
             Wish,

@@ -45,7 +45,7 @@ struct RegisteredERC20Config {
 struct Wish {
     WishStatusEnum status;
     address minter;
-    address token;
+    address rewardToken;
     uint256 amount;
 }
 
@@ -54,7 +54,9 @@ contract Wishport is Ownable {
     using Address for address;
     // ─── Metadata ────────────────────────────────────────────────────────
 
-    IWish _wish; // wishToken
+    string public _name; // Port Name
+    IWish _wishToken; // wishToken
+    uint256 private _numOfBlockExpireSig; // number of blocks a signature will be expired
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constants ───────────────────────────────────────────────────────
@@ -67,8 +69,8 @@ contract Wishport is Ownable {
     /**
      * Access Right Management
      */
-    address private _authedSigner;
-    mapping(address => mapping(uint256 => bool)) public nonce; // Mapping from Account to Consumption Status of Each Nonce, True as the Nonce Has Been Consumed
+    mapping(address => bool) private _managers; // Mapping from Account to Manager Status, True as the Manager
+    mapping(address => mapping(uint256 => bool)) private _nonces; // Mapping from Account to Consumption Status of Each Nonce, True as the Nonce Has Been Consumed
 
     /**
      *  Assets Management
@@ -80,17 +82,18 @@ contract Wishport is Ownable {
     /**
      * Wish Related Information Management
      */
-    mapping(uint256 => Wish) public wishInfo; // Mapping from Wish TokenId to Wish Info
+    mapping(uint256 => Wish) private _wishes; // Mapping from Wish TokenId to Wish Info
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constructor ─────────────────────────────────────────────────────
 
     /**
      * @dev Initialize the smartcontract
-     * @param wishAddress_ The address of the wishToken token
+     * @param name_ The name of the smart contract
+     * @param wishTokenAddress_ The address of the wishToken token
      * @param nativeAssetConfig_ The asset configuration of the native ether of deployed chain
      * ! Requirements:
-     * ! Input wishAddress_ must pass the validation of interfaceGuard corresponding to the IwishToken interface
+     * ! Input wishTokenAddress_ must pass the validation of interfaceGuard corresponding to the IwishToken interface
      * ! Input config_ must pass the validation of portConfigGuard
      * ! Input nativeAssetConfig_ must pass the validation of erc20ConfigGuard
      * * Operations:
@@ -101,16 +104,17 @@ contract Wishport is Ownable {
      * * Initialize the manager status of deployer
      */
     constructor(
-        address wishAddress_,
-        address authedSigner_,
+        string memory name_,
+        address wishTokenAddress_,
         RegisteredERC20Config memory nativeAssetConfig_
     )
-        interfaceGuard(wishAddress_, type(IWish).interfaceId)
+        interfaceGuard(wishTokenAddress_, type(IWish).interfaceId)
         erc20ConfigGuard(nativeAssetConfig_)
     {
-        _wish = IWish(wishAddress_);
+        _name = name_;
+        _wishToken = IWish(wishTokenAddress_);
         _registeredERC20Configs[address(0)] = nativeAssetConfig_;
-        _authedSigner = authedSigner_;
+        _managers[_msgSender()] = true;
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -176,11 +180,11 @@ contract Wishport is Ownable {
      * * Update the nonce_ corresponding to account_ to True after all operations have completed
      */
     modifier nonceGuard(uint256 nonce_, address account_) {
-        require(!nonce[account_][nonce_], WishportError.InvalidNonce);
+        require(!nonce(account_, nonce_), WishportError.InvalidNonce);
 
         _;
 
-        nonce[account_][nonce_] = true;
+        _nonces[account_][nonce_] = true;
     }
 
     /**
@@ -191,10 +195,10 @@ contract Wishport is Ownable {
      * ! The signer of sig_ recovered from msgHash_ must either equals to owner address or be a manager
      * ! The blockNumber_ must be equal or grater than the current blocknumber minus _signatureExpirationBlockNumber
      */
-    modifier signerSignatureGuard(bytes memory sig_, bytes32 msgHash_) {
+    modifier managerSignatureGuard(bytes memory sig_, bytes32 msgHash_) {
         address recoveredSigner = SignatureHelper.recoverSigner(msgHash_, sig_);
         require(
-            recoveredSigner == _authedSigner || recoveredSigner == owner(),
+            recoveredSigner == owner() || managerStatus(recoveredSigner),
             WishportError.InvalidSigner
         );
         _;
@@ -208,7 +212,7 @@ contract Wishport is Ownable {
      * ! Requirements:
      * ! The signer of sig_ recovered from msgHash_ must equals to signer_
      */
-    modifier customSignatureGuard(
+    modifier signatureGuard(
         bytes memory sig_,
         address signer_,
         bytes32 msgHash_
@@ -248,6 +252,15 @@ contract Wishport is Ownable {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Public Functions ────────────────────────────────────────────────
 
+    /**
+     * @dev [Access Right Management] Get the manager status of an account
+     * @param account_ The target account
+     * @return {Manager Status} TRUE as account_ being a manager, FALSE as account_ not a manager
+     */
+    function managerStatus(address account_) public view returns (bool) {
+        return _managers[account_];
+    }
+
     function defaultERC20Config()
         public
         view
@@ -273,6 +286,29 @@ contract Wishport is Ownable {
         return config.activated ? config : defaultERC20Config();
     }
 
+    /**
+     * @dev [Wish Related Information Management] Get the wish info by tokenId
+     * @param tokenId_ the tokenId of the wish
+     * @return {Wish Info}
+     */
+    function wish(uint256 tokenId_) public view returns (Wish memory) {
+        return _wishes[tokenId_];
+    }
+
+    /**
+     * @dev [Access Right Management] Get the consumption status of a nonce under an account
+     * @param account_ The target account
+     * @param nonce_ The target nonce
+     * @return {Consumption Status} TRUE as nonce_ of account_ has been consumed, and FALSE otherwise
+     */
+    function nonce(address account_, uint256 nonce_)
+        public
+        view
+        returns (bool)
+    {
+        return _nonces[account_][nonce_];
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── External Functions ──────────────────────────────────────────────────────
 
@@ -280,8 +316,8 @@ contract Wishport is Ownable {
      * @dev [Metadata] Get the address of wishToken token
      * @return {wishToken Address}
      */
-    function wish() external view returns (address) {
-        return address(_wish);
+    function wishToken() external view returns (address) {
+        return address(_wishToken);
     }
 
     /**
@@ -300,15 +336,19 @@ contract Wishport is Ownable {
     /**
      * @dev Set the manager status of an account
      * @param account_ The target account to be updated with new manager status
+     * @param status_ The new manager status
      * ! Requirements:
      * ! The caller must be the owner
      * ! Input account_ must be a valid address
      * * Operations:
      * * Update the port config with config_
      */
-    function setAuthedSigner(address account_) external onlyOwner {
+    function setManagerStatus(address account_, bool status_)
+        external
+        onlyOwner
+    {
         _checkAddress(account_);
-        _authedSigner = account_;
+        _managers[account_] = status_;
     }
 
     /**
@@ -341,12 +381,72 @@ contract Wishport is Ownable {
     // ─── Mint Wish ───────────────────────────────────────────────────────────────
 
     /**
+     * @dev Ensure the asset related input is valid
+     * @param assetId_ the assetId of the wish reward
+     * @param assetAmount_ the amount of the wish reward
+     * ! Requirements:
+     * ! Input assetAmount_ must greater than the MINIMUM_REWARD in the asset configuration
+     * ! If the assetId_ equals to the NATIVE_INDEX, msg.value must be equal to the assetAmount_
+     * ! If the assetId_ NOT equals to the NATIVE_INDEX, assetId_ must be mapped to a valid ERC20 address
+     * ! If the assetId_ NOT equals to the NATIVE_INDEX, assetAmount_ amount of ERC20 token corresponding to assetId_ must be transfered from _msgSender() address to this contract
+     * * Operations:
+     * * Increment the reward pool balance corresponding to assetId_ by assetAmount_
+     * * Increment the account balance of the _msgSender() corresponding to assetId_ by assetAmount_
+     */
+    // modifier mintWishAssetGuard(uint256 assetId_, uint256 assetAmount_) {
+    //     RegisteredERC20Config memory assetConfig = registeredERC20Config(
+    //         assetId_
+    //     );
+    //     uint256 finalAmount_;
+    //     require(
+    //         assetAmount_ >= assetConfig.MINIMUM_REWARD,
+    //         WishportError.InvalidAsset
+    //     );
+    //     if (assetId_ == NATIVE_INDEX) {
+    //         require(msg.value == assetAmount_, WishportError.InvalidAsset);
+    //         finalAmount_ = assetAmount_;
+    //     } else {
+
+
+    //         address targetERC20Address = registeredERC20(assetId_);
+    //         require(
+    //             targetERC20Address != address(0),
+    //             WishportError.InvalidAsset
+    //         );
+    //         uint256 balanceBefore = IERC20(targetERC20Address).balanceOf(
+    //             address(this)
+    //         );
+
+    //         IERC20(targetERC20Address).safeTransferFrom(
+    //             _msgSender(),
+    //             address(this),
+    //             assetAmount_
+    //         );
+
+    //         uint256 balanceAfter = IERC20(targetERC20Address).balanceOf(
+    //             address(this)
+    //         );
+    //         require(
+    //             balanceAfter >= balanceBefore,
+    //             WishportError.ERC20TransferError
+    //         );
+    //         finalAmount_ = balanceAfter - balanceBefore;
+    //     }
+
+    //     _;
+
+    //     _rewardPools[assetId_] += finalAmount_;
+    //     _accountBalances[assetId_][_msgSender()] += finalAmount_;
+    // }
+
+    /**
      * @dev Mint a wish
      * @param tokenId_ The tokenId of the target wish
      * @param nonce_ The target nonce_ of the _msgSender() to be consumed
      * @param sig_ The authorization signature signed by the contract owner or the managers
      * @param assetId_ the intended assetId of the reward
      * @param assetAmount_ the intended amount of the reward
+     * @param blockNumber_ the block number when the signature is signed
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
      * ! Input sig_ must pass the validation of managerSignatureGuard
@@ -369,7 +469,7 @@ contract Wishport is Ownable {
         external
         payable
         nonceGuard(nonce_, _msgSender())
-        signerSignatureGuard(
+        managerSignatureGuard(
             sig_,
             SignatureHelper.prefixed(
                 keccak256(
@@ -384,7 +484,33 @@ contract Wishport is Ownable {
                 )
             )
         )
-    {}
+        blockNumberGuard(blockNumber_, 100) // only allows 200 blocks time
+        // mintWishAssetGuard(assetId_, assetAmount_)
+    {
+        Wish storage _currentWish = _wishes[tokenId_];
+        require(_currentWish.minter == address(0), WishportError.InvalidWish);
+        _currentWish.status = WishStatusEnum.OUTSTANDING;
+        _currentWish.minter = _msgSender();
+        // _currentWish.assetId = assetId_;
+        _currentWish.amount = assetAmount_;
+        // WishHistory storage _accountWishHistory = _wishHistories[_msgSender()];
+        // _accountWishHistory.mintedWishes[
+        //     _accountWishHistory.mintedWishCount++
+        // ] = tokenId_;
+
+        // // mint the ERC721 wish token
+        // bytes memory returndata = address(_wishToken).functionCall(
+        //     abi.encodeWithSelector(
+        //         _wishToken.mint.selector,
+        //         _msgSender(),
+        //         tokenId_
+        //     )
+        // );
+        // require(
+        //     returndata.length > 0 && abi.decode(returndata, (bool)),
+        //     WishportError.MintWishError
+        // );
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Burn A Wish ─────────────────────────────────────────────────────────────
@@ -415,7 +541,7 @@ contract Wishport is Ownable {
         external
         payable
         nonceGuard(nonce_, _msgSender())
-        signerSignatureGuard(
+        managerSignatureGuard(
             sig_,
             SignatureHelper.prefixed(
                 keccak256(
@@ -431,7 +557,76 @@ contract Wishport is Ownable {
             )
         )
         blockNumberGuard(blockNumber_, 100) // only allows 100 blocks time
-    {}
+    {
+        Wish storage currentWish = _wishes[tokenId_];
+        // caller must be the wish owner
+        require(_msgSender() == currentWish.minter, WishportError.Unauthorized);
+        require(
+            _msgSender() == _wishToken.ownerOf(tokenId_),
+            WishportError.Unauthorized
+        );
+        // wish must have status equals to OUTSTANDING
+        require(
+            currentWish.status == WishStatusEnum.OUTSTANDING,
+            WishportError.InvalidWish
+        );
+        // wish must not have any outstanding fulfillment
+        // require(
+        //     currentWish.fulfiller == address(0),
+        //     WishportError.Unauthorized
+        // );
+
+        // record the asset info before delete
+        // uint256 assetId = currentWish.assetId;
+        // uint256 assetAmount = currentWish.amount;
+
+        // // remove the corresponding wish information
+        // currentWish.status = WishStatusEnum.INACTIVE;
+        // currentWish.minter = address(0);
+        // currentWish.assetId = 0;
+        // currentWish.amount = 0;
+
+        // WishHistory storage wishHistory = _wishHistories[_msgSender()];
+        // uint256 memberIdx;
+        // uint256 lastIdx = wishHistory.mintedWishCount - 1;
+        // for (uint256 i = 0; i <= lastIdx; i++) {
+        //     if (wishHistory.mintedWishes[i] == tokenId_) {
+        //         memberIdx = i;
+        //         break;
+        //     }
+        // }
+        // // If the target account is not the last member in current mintedWishes list,
+        // // assign the last member to this memberIdx & remove the last member
+        // if (memberIdx != (lastIdx)) {
+        //     wishHistory.mintedWishes[memberIdx] = wishHistory.mintedWishes[
+        //         lastIdx
+        //     ];
+        // }
+        // delete wishHistory.mintedWishes[lastIdx];
+        // wishHistory.mintedWishCount -= 1;
+
+        // // burn the ERC721 wish token
+        // bytes memory returndata = address(_wishToken).functionCall(
+        //     abi.encodeWithSelector(_wishToken.burn.selector, tokenId_)
+        // );
+        // require(
+        //     returndata.length > 0 && abi.decode(returndata, (bool)),
+        //     WishportError.MintWishError
+        // );
+
+        // // transfer the corresponding asset back to user
+        // if (assetId == 0) {
+        //     (bool success, ) = _msgSender().call{value: assetAmount}("");
+        //     require(success, WishportError.AssetTransferError);
+        // } else {
+        //     address targetERC20Address = registeredERC20(assetId);
+        //     IERC20(targetERC20Address).safeTransferFrom(
+        //         address(this),
+        //         _msgSender(),
+        //         assetAmount
+        //     );
+        // }
+    }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Create Fulfillment Of A Wish ────────────────────────────────────────────
@@ -467,7 +662,7 @@ contract Wishport is Ownable {
         external
         payable
         nonceGuard(fulfillerNonce_, fulfiller_)
-        customSignatureGuard(
+        signatureGuard(
             applicationSig_,
             fulfiller_,
             SignatureHelper.prefixed(
@@ -485,7 +680,19 @@ contract Wishport is Ownable {
             )
         )
     {
-     
+        // Wish storage currentWish = _wishes[tokenId_];
+        // require(currentWish.minter == _msgSender(), WishportError.Unauthorized);
+        // require(currentWish.fulfiller == address(0), WishportError.InvalidWish);
+        // require(
+        //     snapshotAssetId_ == currentWish.assetId &&
+        //         snapshotAssetAmount_ <= currentWish.amount,
+        //     WishportError.InvalidAsset
+        // );
+        // currentWish.fulfiller = fulfiller_;
+        // WishHistory storage fulfillerWishHistory = _wishHistories[fulfiller_];
+        // fulfillerWishHistory.fulfillments[
+        //     fulfillerWishHistory.fulfillmentCount++
+        // ] = tokenId_;
     }
     // ─────────────────────────────────────────────────────────────────────
     // update fulfillment (confirm or cancel)

@@ -1,17 +1,17 @@
 import { contractDeployer } from '../../utils/ContractDeployer';
-import {  expectFnReturnChange } from '../../../ethers-test-helpers'
+import { expectFnReturnChange } from '../../../ethers-test-helpers'
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 describe('UNIT TEST: Wish Contract - _beforeTokenTransfer', () => {
   it(`_beforeTokenTransfer: should decrement prev owner balanceOfTransferable
 `, async () => {
-    const [owner, wishport, account, accountB] = await ethers.getSigners()
-    const [wish, soulhub] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, account, accountB] = await ethers.getSigners()
+    const [wish, soulhub] = await contractDeployer.Wish({ owner })
     const tokenId = 0
     const soul = 1
-    await wish.connect(wishport).mint(account.address, tokenId)
-    await wish.connect(wishport).setTransferable(tokenId, true);
+    await wish.connect(owner).mint(account.address, tokenId)
+    await wish.connect(owner).setTransferable(tokenId, true);
     await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
     await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
@@ -32,13 +32,13 @@ describe('UNIT TEST: Wish Contract - _beforeTokenTransfer', () => {
   })
   it(`_beforeTokenTransfer: should increment new owner balanceOfTransferable
 `, async () => {
-    const [owner, wishport, account, accountB] = await ethers.getSigners()
-    const [wish, soulhub] = await contractDeployer.Wish({ owner, wishportAddress: wishport.address })
+    const [owner, account, accountB] = await ethers.getSigners()
+    const [wish, soulhub] = await contractDeployer.Wish({ owner })
 
     const tokenId = 0
     const soul = 1
-    await wish.connect(wishport).mint(account.address, tokenId)
-    await wish.connect(wishport).setTransferable(tokenId, true);
+    await wish.connect(owner).mint(account.address, tokenId)
+    await wish.connect(owner).setTransferable(tokenId, true);
     await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
     await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
