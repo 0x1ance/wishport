@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../utils/SignatureHelper.sol";
 import "../wish/IWish.sol";
+import "../wish/Wish.sol";
 
 library WishportError {
     string constant InvalidInterface = "Wishport:InvalidInterface";
@@ -28,6 +29,10 @@ library WishportError {
     string constant InvalidBlock = "Wishport:InvalidBlock";
 }
 
+// WishStatusEnum
+// INACTIVE: ownerof == address(0)
+// OUTSTNADING: ownerof != address(0) && completed == FALSE
+// COMPLETED: ownerof != address(0) && completed == TRUE
 enum WishStatusEnum {
     INACTIVE,
     OUTSTANDING,
@@ -42,9 +47,8 @@ struct RegisteredERC20Config {
     uint256 DISPUTE_HANDLING_FEE_PORTION;
 }
 
-struct Wish {
-    WishStatusEnum status;
-    address minter;
+// minter: ownerof when ownerof != address(0)
+struct WishRewardInfo {
     address token;
     uint256 amount;
 }
@@ -80,14 +84,13 @@ contract Wishport is Ownable {
     /**
      * Wish Related Information Management
      */
-    mapping(uint256 => Wish) public wishInfo; // Mapping from Wish TokenId to Wish Info
+    mapping(uint256 => WishRewardInfo) public wishRewardInfo; // Mapping from Wish TokenId to Wish Reward Info
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constructor ─────────────────────────────────────────────────────
 
     /**
      * @dev Initialize the smartcontract
-     * @param wishAddress_ The address of the wishToken token
      * @param nativeAssetConfig_ The asset configuration of the native ether of deployed chain
      * ! Requirements:
      * ! Input wishAddress_ must pass the validation of interfaceGuard corresponding to the IwishToken interface
@@ -101,14 +104,23 @@ contract Wishport is Ownable {
      * * Initialize the manager status of deployer
      */
     constructor(
-        address wishAddress_,
+        string memory name_,
+        string memory symbol_,
+        string memory contractURI_,
+        string memory uri_,
+        address soulhub_,
         address authedSigner_,
         RegisteredERC20Config memory nativeAssetConfig_
-    )
-        interfaceGuard(wishAddress_, type(IWish).interfaceId)
-        erc20ConfigGuard(nativeAssetConfig_)
-    {
-        _wish = IWish(wishAddress_);
+    ) erc20ConfigGuard(nativeAssetConfig_) {
+        Wish newWish = new Wish(
+            name_,
+            symbol_,
+            contractURI_,
+            uri_,
+            soulhub_,
+            _msgSender()
+        );
+        _wish = IWish(address(newWish));
         _registeredERC20Configs[address(0)] = nativeAssetConfig_;
         _authedSigner = authedSigner_;
     }
@@ -306,6 +318,20 @@ contract Wishport is Ownable {
      * * Operations:
      * * Update the port config with config_
      */
+    function setWishManager(address account_) external onlyOwner {
+        _checkAddress(account_);
+        _wish.setManager(account_);
+    }
+
+    /**
+     * @dev Set the manager status of an account
+     * @param account_ The target account to be updated with new manager status
+     * ! Requirements:
+     * ! The caller must be the owner
+     * ! Input account_ must be a valid address
+     * * Operations:
+     * * Update the port config with config_
+     */
     function setAuthedSigner(address account_) external onlyOwner {
         _checkAddress(account_);
         _authedSigner = account_;
@@ -484,9 +510,7 @@ contract Wishport is Ownable {
                 )
             )
         )
-    {
-     
-    }
+    {}
     // ─────────────────────────────────────────────────────────────────────
     // update fulfillment (confirm or cancel)
     // burn wish

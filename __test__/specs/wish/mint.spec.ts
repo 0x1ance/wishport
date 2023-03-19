@@ -6,7 +6,6 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 describe('UNIT TEST: Wish Contract - mint', () => {
-
   it(`mint: should throw error if the caller is not owner
 `, async () => {
     const [owner, notOwner] = await ethers.getSigners()

@@ -31,7 +31,7 @@ describe('UNIT TEST: Wish Contract - tokensOfOwner', () => {
     expect(res.includes(tokenIds[1]))
     expect(res.includes(tokenIds[2]))
   })
-  it(`tokensOfOwner: should only return transferable tokens if the request status input is true
+  it(`tokensOfOwner: should only return completed tokens if the request status input is true
   `, async () => {
     const [owner, account] = await ethers.getSigners()
     const [wish] = await contractDeployer.Wish({ owner })
@@ -49,9 +49,9 @@ describe('UNIT TEST: Wish Contract - tokensOfOwner', () => {
     await wish.connect(owner).mint(account.address, tokenIds[1])
     await wish.connect(owner).mint(account.address, tokenIds[2])
 
-    // set two as transferable
-    await wish.connect(owner).setTransferable(tokenIds[0], true)
-    await wish.connect(owner).setTransferable(tokenIds[2], true)
+    // set two as completed
+    await wish.connect(owner).setCompleted(tokenIds[0], true)
+    await wish.connect(owner).setCompleted(tokenIds[2], true)
 
     const res = contractReturnHandler(await wish.connect(owner)['tokensOfOwner(address,bool)'](account.address, true))
 
@@ -59,7 +59,7 @@ describe('UNIT TEST: Wish Contract - tokensOfOwner', () => {
     expect(res.includes(tokenIds[0]))
     expect(res.includes(tokenIds[2]))
   })
-  it(`tokensOfOwner: should only return non transferable tokens if the request status input is false
+  it(`tokensOfOwner: should only return non completed tokens if the request status input is false
   `, async () => {
     const [owner, account] = await ethers.getSigners()
     const [wish] = await contractDeployer.Wish({ owner })
@@ -76,9 +76,9 @@ describe('UNIT TEST: Wish Contract - tokensOfOwner', () => {
     await wish.connect(owner).mint(account.address, tokenIds[1])
     await wish.connect(owner).mint(account.address, tokenIds[2])
 
-    // set two as transferable
-    await wish.connect(owner).setTransferable(tokenIds[0], true)
-    await wish.connect(owner).setTransferable(tokenIds[2], true)
+    // set two as completed
+    await wish.connect(owner).setCompleted(tokenIds[0], true)
+    await wish.connect(owner).setCompleted(tokenIds[2], true)
 
     const res = contractReturnHandler(await wish.connect(owner)['tokensOfOwner(address,bool)'](account.address, false))
 

@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "./IWish.sol";
 
 library WishError {
-    string constant SetTransferableError = "Wish:SetTransferableError";
+    string constant SetCompletedError = "Wish:SetCompletedError";
     string constant UnauthorizedError = "Wish:Unauthorized";
     string constant InvalidAddress = "Wish:InvalidAddress";
 }
@@ -17,13 +17,14 @@ library WishError {
 contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     // ─── Events ──────────────────────────────────────────────────────────────────
 
-    event SetTransferable(uint256 indexed tokenId_, bool status);
+    event SetCompleted(uint256 indexed tokenId_, bool status);
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Metadata ────────────────────────────────────────────────────────
 
-    string private _uri; // baseURI of the ERC721 metadata
-    address public wishport; // address of the wishport contract
+    string private _contractURI; // uri for the contract metadata (for OPENSEA)
+    string private _uri; // baseURI of the ERC721 token metadata
+    address public manager; // address of the contract manager
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Variables ───────────────────────────────────────────────────────────────
@@ -31,8 +32,8 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      *  Token Management
      */
-    mapping(uint256 => bool) _transferable; // Mapping from tokenId to transferable status, if true then transferable
-    mapping(address => uint256) _balanceOfTransferable; // Mapping from address to transferable token balance
+    mapping(uint256 => bool) public completed; // Mapping from tokenId to completed status, if true then completed
+    mapping(address => uint256) public balanceOfCompleted; // Mapping from address to completed token balance
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constructor ─────────────────────────────────────────────────────────────
@@ -48,24 +49,26 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     constructor(
         string memory name_,
         string memory symbol_,
+        string memory contractURI_,
         string memory uri_,
         address soulhub_,
-        address wishport_
+        address manager_
     ) ERC721Soulbound(name_, symbol_, soulhub_) {
-        require(wishport_ != address(0), WishError.InvalidAddress);
+        require(manager_ != address(0), WishError.InvalidAddress);
+        _contractURI = contractURI_;
         _uri = uri_;
-        wishport = wishport_;
+        manager = manager_;
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Modifiers ───────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Ensure the message sender is the wishport contract
+     * @dev [Metadata] Ensure the message sender is the contract manager
      */
-    modifier onlyWishport() {
+    modifier onlyManager() {
         require(
-            _msgSender() == wishport || _msgSender() == owner(),
+            _msgSender() == manager || _msgSender() == owner(),
             WishError.UnauthorizedError
         );
         _;
@@ -84,8 +87,8 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         return _uri;
     }
 
-    function transferable(uint256 tokenId_) public view returns (bool) {
-        return _transferable[tokenId_];
+    function contractURI() public view returns (string memory) {
+        return _contractURI;
     }
 
     function _checkTokenTransferEligibility(
@@ -99,26 +102,22 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         }
 
         // only allow not locked tokens to be transferred under same soul
-        return transferable(tokenId_) && _checkSameSoul(from_, to_);
+        return completed[tokenId_] && _checkSameSoul(from_, to_);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── external Functions ────────────────────────────────────────────────
 
-    function setBaseURI(string memory uri_) external onlyWishport {
+    function setBaseURI(string memory uri_) external onlyManager {
         _uri = uri_;
     }
 
-    function setWishport(address wishport_) external onlyOwner {
-        wishport = wishport_;
+    function setContractURI(string memory uri_) external onlyManager {
+        _contractURI = uri_;
     }
 
-    function balanceOfTransferable(address account_)
-        public
-        view
-        returns (uint256)
-    {
-        return _balanceOfTransferable[account_];
+    function setManager(address manager_) external onlyOwner {
+        manager = manager_;
     }
 
     /**
@@ -139,24 +138,24 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      * @dev Returns all the tokens owned by an address
      */
-    function tokensOfOwner(address a_, bool transferable_)
+    function tokensOfOwner(address a_, bool completed_)
         public
         view
         returns (uint256[] memory)
     {
         uint256 ownerTokenCount = balanceOf(a_);
-        uint256 ownerTransferableTokenCount = balanceOfTransferable(a_);
+        uint256 ownerCompletedTokenCount = balanceOfCompleted[a_];
 
-        uint256 tokenCount = transferable_
-            ? ownerTransferableTokenCount
-            : (ownerTokenCount - ownerTransferableTokenCount);
+        uint256 tokenCount = completed_
+            ? ownerCompletedTokenCount
+            : (ownerTokenCount - ownerCompletedTokenCount);
 
         uint256[] memory ownedTokens = new uint256[](tokenCount);
 
         uint256 counter = 0;
         for (uint256 i = 0; i < ownerTokenCount; i++) {
             uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
-            if (transferable(currentTokenId) == transferable_) {
+            if (completed[currentTokenId] == completed_) {
                 ownedTokens[counter++] = currentTokenId;
             }
             if (counter >= tokenCount) {
@@ -198,32 +197,29 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     }
 
     /**
-     * @dev set the token transferablity
+     * @dev set the token completion state
      *
      * Requirements:
      *
      * - only owner or soul verifiers can mint to address
      * - token has to be minted
      */
-    function setTransferable(uint256 tokenId_, bool status_)
+    function setCompleted(uint256 tokenId_, bool status_)
         external
         onlyOwner
         returns (bool)
     {
         _requireMinted(tokenId_);
-        require(
-            _transferable[tokenId_] != status_,
-            WishError.SetTransferableError
-        );
-        // if set true, increment the owner transferable balance
-        // else decrement the owner transferable balance
+        require(completed[tokenId_] != status_, WishError.SetCompletedError);
+        // if set true, increment the owner completed balance
+        // else decrement the owner completed balance
         if (status_) {
-            _balanceOfTransferable[ownerOf(tokenId_)] += 1;
+            balanceOfCompleted[ownerOf(tokenId_)] += 1;
         } else {
-            _balanceOfTransferable[ownerOf(tokenId_)] -= 1;
+            balanceOfCompleted[ownerOf(tokenId_)] -= 1;
         }
-        _transferable[tokenId_] = status_;
-        emit SetTransferable(tokenId_, status_);
+        completed[tokenId_] = status_;
+        emit SetCompleted(tokenId_, status_);
         return true;
     }
 
@@ -240,13 +236,13 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         uint256 batchSize_
     ) internal virtual override(ERC721Enumerable, ERC721Soulbound) {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
-        // if token is transferable, update the transferable balance
+        // if token is completed, update the completed balance
 
-        if (from_ != address(0) && transferable(tokenId_)) {
-            _balanceOfTransferable[from_] -= 1;
+        if (from_ != address(0) && completed[tokenId_]) {
+            balanceOfCompleted[from_] -= 1;
         }
-        if (to_ != address(0) && transferable(tokenId_)) {
-            _balanceOfTransferable[to_] += 1;
+        if (to_ != address(0) && completed[tokenId_]) {
+            balanceOfCompleted[to_] += 1;
         }
     }
 

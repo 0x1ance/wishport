@@ -24,15 +24,19 @@ interface IWish is IERC721 {
      */
     function burn(uint256 tokenId_) external returns (bool);
 
+    function completed(uint256 tokenId_) external view returns (bool);
+
+    function setManager(address manager_) external;
+    
     /**
-     * @dev set the token transferablity
+     * @dev set the token completion status
      *
      * Requirements:
      *
      * - only owner or soul verifiers can mint to address
      * - token has to be minted
      */
-    function setTransferable(uint256 tokenId_, bool status_)
+    function setCompleted(uint256 tokenId_, bool status_)
         external
         returns (bool);
 }

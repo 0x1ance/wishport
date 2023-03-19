@@ -18,16 +18,19 @@ describe('UNIT TEST: Wish Contract - deployment', () => {
     expect(await wish.soulhub()).to.equal(soulhub.address)
   })
 
-  it('deployment: should set name, symbol, uri & wishport metadata', async () => {
-    const [owner, wishport] = await ethers.getSigners()
+  it('deployment: should set name, symbol, uri, contractURI & manager metadata', async () => {
+    const [owner, manager] = await ethers.getSigners()
     const name = chance.word({ length: 10 })
     const symbol = chance.word({ length: 5 })
+    const uri = chance.domain({ length: 8 })
+    const contractURI = chance.domain({ length: 8 })
     const [soulhub] = await contractDeployer.Soulhub({ owner, name })
-    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol, wishport: wishport.address })
+    const [wish] = await contractDeployer.Wish({ owner, soulhub, name, symbol, manager: manager.address, uri, contractURI })
 
     expect(await wish.name()).to.equal(name)
     expect(await wish.symbol()).to.equal(symbol)
-    expect(await wish.wishport()).to.equal(wishport.address)
+    expect(await wish.manager()).to.equal(manager.address)
+    expect(await wish.contractURI()).to.equal(contractURI)
   })
 
   it('deployment: should throw error if the input soulhub address does not supports ISoulhub interface', async () => {
@@ -44,8 +47,7 @@ describe('UNIT TEST: Wish Contract - deployment', () => {
     const [owner] = await ethers.getSigners()
 
     await expectRevert(
-      // @ts-ignore
-      contractDeployer.Wish({ owner, wishport: ZERO_ADDRESS }),
+      contractDeployer.Wish({ owner, manager: ZERO_ADDRESS }),
       'Wish:InvalidAddress'
     )
   })

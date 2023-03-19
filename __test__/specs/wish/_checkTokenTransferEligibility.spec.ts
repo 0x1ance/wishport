@@ -6,7 +6,7 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
 describe('UNIT TEST: Wish Contract - _checkTokenTransferEligibility', () => {
-  it(`_checkTokenTransferEligibility: should return false if the token is not transferable
+  it(`_checkTokenTransferEligibility: should return false if the token is not completed
 `, async () => {
     const [owner, account, accountB] = await ethers.getSigners()
     const [wish] = await contractDeployer.Wish({ owner })
@@ -14,7 +14,7 @@ describe('UNIT TEST: Wish Contract - _checkTokenTransferEligibility', () => {
     const tokenId = 0
     await wish.connect(owner).mint(account.address, tokenId)
 
-    expect(await wish.transferable(tokenId)).to.be.false
+    expect(await wish.completed(tokenId)).to.be.false
     await expectRevert(
       wish.connect(account).transferFrom(account.address, accountB.address, tokenId),
       'ERC721Soulbound:Unauthorized'
@@ -27,9 +27,9 @@ describe('UNIT TEST: Wish Contract - _checkTokenTransferEligibility', () => {
 
     const tokenId = 0
     await wish.connect(owner).mint(account.address, tokenId)
-    await wish.connect(owner).setTransferable(tokenId, true);
+    await wish.connect(owner).setCompleted(tokenId, true);
 
-    expect(await wish.transferable(tokenId)).to.be.true
+    expect(await wish.completed(tokenId)).to.be.true
     await expectRevert(
       wish.connect(account).transferFrom(account.address, accountB.address, tokenId),
       'ERC721Soulbound:Unauthorized'
@@ -42,11 +42,11 @@ describe('UNIT TEST: Wish Contract - _checkTokenTransferEligibility', () => {
     const tokenId = 0
     const soul = 1
     await wish.connect(owner).mint(account.address, tokenId)
-    await wish.connect(owner).setTransferable(tokenId, true);
+    await wish.connect(owner).setCompleted(tokenId, true);
     await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
     await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
-    expect(await wish.transferable(tokenId)).to.be.true
+    expect(await wish.completed(tokenId)).to.be.true
     expect(await soulhub.sameSoul(account.address, accountB.address)).to.be.true
 
     await expectFnReturnChange(
@@ -69,11 +69,11 @@ describe('UNIT TEST: Wish Contract - _checkTokenTransferEligibility', () => {
     const tokenId = 0
     const soul = 1
     await wish.connect(owner).mint(account.address, tokenId)
-    await wish.connect(owner).setTransferable(tokenId, true);
+    await wish.connect(owner).setCompleted(tokenId, true);
     await soulhub.connect(owner)['setSoul(address,uint256)'](account.address, soul)
     await soulhub.connect(owner)['setSoul(address,uint256)'](accountB.address, soul)
 
-    expect(await wish.transferable(tokenId)).to.be.true
+    expect(await wish.completed(tokenId)).to.be.true
     expect(await soulhub.sameSoul(account.address, accountB.address)).to.be.true
 
     await expectFnReturnChange(

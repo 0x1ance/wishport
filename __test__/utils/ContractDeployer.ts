@@ -29,11 +29,11 @@ type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConf
     name?: string,
     symbol?: string,
     uri?: string,
-    wishport?: string
+    contractURI?: string
+    manager?: string
 }
 
 class ContractDeployer {
-
     async SoulhubManager(
         { owner }: ContractDeploymentBaseConfig = {}
     ) {
@@ -42,6 +42,7 @@ class ContractDeployer {
         const targetOwner = owner ?? defaultOwner
         const soulhubManager = await contractFactory.connect(targetOwner).deploy(
         )
+
         return [soulhubManager, targetOwner] as [
             SoulhubManager,
             SignerWithAddress,
@@ -87,7 +88,7 @@ class ContractDeployer {
         ]
     }
     async Wish(
-        { owner, wishport, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), soulhub, soulhubManager }: WishDeploymentConfig = {}
+        { owner, manager, name = chance.string({ length: 8 }), symbol = chance.string({ length: 8 }), uri = chance.domain({ length: 8 }), contractURI = chance.domain({ length: 8 }), soulhub, soulhubManager }: WishDeploymentConfig = {}
     ) {
         const [defaultOwner] = await ethers.getSigners()
         const targetOwner = owner ?? defaultOwner
@@ -99,9 +100,10 @@ class ContractDeployer {
         const wish = await contractFactory.connect(targetOwner).deploy(
             name,
             symbol,
+            contractURI,
             uri,
             targetSoulhub.address,
-            wishport ?? targetOwner.address
+            manager ?? targetOwner.address
         )
         return [wish, targetSoulhub, targetSoulhubManager, targetOwner] as [
             Wish,
