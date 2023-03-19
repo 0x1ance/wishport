@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
-pragma experimental ABIEncoderV2;
 
-// access control
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -166,13 +163,18 @@ contract Wishport is Ownable {
      * @param msgHash_ the intended hash of the signature message for validation
      * ! Requirements:
      * ! The signer of sig_ recovered from msgHash_ must either equals to owner address or be a manager
-     * ! The blockNumber_ must be equal or grater than the current blocknumber minus _signatureExpirationBlockNumber
+     * ! The sigExpireBlockNum_ must be equal or grater than the current blocknumber
      */
     modifier signatureGuard(
         bytes memory sig_,
         address signer_,
-        bytes32 msgHash_
+        bytes32 msgHash_,
+        uint256 sigExpireBlockNum_
     ) {
+        require(
+            sigExpireBlockNum_ >= block.number,
+            WishportError.SignatureExpired
+        );
         address recoveredSigner = msgHash_.toEthSignedMessageHash().recover(
             sig_
         );
@@ -287,10 +289,11 @@ contract Wishport is Ownable {
     /**
      * @dev Mint a wish
      * @param tokenId_ The tokenId of the target wish
-     * @param nonce_ The target nonce_ of the _msgSender() to be consumed
-     * @param sig_ The authorization signature signed by the contract owner or the managers
-     * @param assetId_ the intended assetId of the reward
+     * @param assetAddress_ the intended asset address of the reward, address(0) as the base ether
      * @param assetAmount_ the intended amount of the reward
+     * @param nonce_ The target nonce_ of the _msgSender() to be consumed
+     * @param sigExpireBlockNum_ the block number where the signature will be expired at
+     * @param sig_ The authorization signature signed by the authedSigner
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
      * ! Input sig_ must pass the validation of managerSignatureGuard
@@ -303,11 +306,11 @@ contract Wishport is Ownable {
      */
     function mint(
         uint256 tokenId_,
-        uint256 nonce_,
-        bytes memory sig_,
-        uint256 assetId_,
+        uint256 assetAddress_,
         uint256 assetAmount_,
-        uint256 blockNumber_
+        uint256 nonce_,
+        uint256 sigExpireBlockNum_,
+        bytes memory sig_
     )
         external
         payable
@@ -317,14 +320,17 @@ contract Wishport is Ownable {
             address(0),
             keccak256(
                 abi.encodePacked(
-                    "mint(uint256,uint256,bytes,uint256,uint256)",
+                    "mint(uint256,uint256,uint256,uint256,uint256,bytes)",
                     address(this),
                     _msgSender(),
                     tokenId_,
+                    assetAddress_,
+                    assetAmount_,
                     nonce_,
-                    blockNumber_
+                    sigExpireBlockNum_
                 )
-            )
+            ),
+            sigExpireBlockNum_
         )
     {}
 
@@ -336,7 +342,7 @@ contract Wishport is Ownable {
      * @param tokenId_ The tokenId of the target wish
      * @param nonce_ The target nonce_ of the _msgSender() to be consumed
      * @param sig_ The authorization signature signed by the contract owner or the managers
-     * @param blockNumber_ the block number when the signature is signed
+     * @param sigExpireBlockNum_ the block number when the signature is expired
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
      * ! Input sig_ && blockNumber must pass the validation of managerSignatureGuard
@@ -351,7 +357,7 @@ contract Wishport is Ownable {
         uint256 tokenId_,
         uint256 nonce_,
         bytes memory sig_,
-        uint256 blockNumber_
+        uint256 sigExpireBlockNum_
     )
         external
         payable
@@ -366,9 +372,10 @@ contract Wishport is Ownable {
                     _msgSender(),
                     tokenId_,
                     nonce_,
-                    blockNumber_
+                    sigExpireBlockNum_
                 )
-            )
+            ),
+            sigExpireBlockNum_
         )
     {}
 
