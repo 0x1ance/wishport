@@ -18,6 +18,9 @@ library WishportError {
     string constant InvalidSigner = "Wishport:InvalidSigner";
     string constant InvalidNonce = "Wishport:InvalidNonce";
     string constant SignatureExpired = "Wishport:SignatureExpired";
+    string constant InvalidToken = "Wishport:InvalidToken";
+    string constant InsufficientBalance = "Wishport:InsufficientBalance";
+    string constant WishTokenError = "Wishport:WishTokenError";
 }
 
 // WishStatusEnum
@@ -38,9 +41,8 @@ struct WishRewardInfo {
 
 // asset config
 struct AssetConfig {
-    // PLATFORM_FEE_PORTION: e.g. 250_000_000 for 25% in uint256 basis points (parts per 1_000_000_000)
+    // PLATFORM_FEE_PORTION: e.g. 250_000 for 25% in uint256 basis points (parts per 1_000_000_000)
     bool activated;
-    uint256 MINIMUM_REWARD;
     uint256 PLATFORM_FEE_PORTION;
     uint256 DISPUTE_HANDLING_FEE_PORTION;
 }
@@ -57,7 +59,7 @@ contract Wishport is Ownable {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constants ───────────────────────────────────────────────────────
 
-    uint256 public constant BASE_PORTION = 1_000_000_000; // Base Denominator for Portion Calculations
+    uint256 public constant BASE_PORTION = 1_000_000; // Base Denominator for Portion Calculations
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Variables ───────────────────────────────────────────────────────────────
@@ -104,6 +106,7 @@ contract Wishport is Ownable {
         address authedSigner_,
         AssetConfig memory nativeAssetConfig_
     ) assetConfigGuard(address(0), nativeAssetConfig_) {
+        require(authedSigner_ != address(0), WishportError.InvalidSigner);
         Wish newWish = new Wish(
             name_,
             symbol_,
@@ -124,6 +127,7 @@ contract Wishport is Ownable {
      * @dev [Assets Management] Ensure the erc20 asset configuration is valid
      * @param config_ The updated erc20 asset config
      * ! Requirements:
+     * ! if token_ is address(0), the config.activated must be TRUE
      * ! Input config_.PLATFORM_FEE_PORTION must equals or less than the BASE_PORTION
      * ! Input config_.DISPUTE_HANDLING_FEE_PORTION must equals or less than the BASE_PORTION
      */
@@ -149,7 +153,7 @@ contract Wishport is Ownable {
      * * Operations:
      * * Update the nonce_ corresponding to account_ to True after all operations have completed
      */
-    modifier nonceGuard(uint256 nonce_, address account_) {
+    modifier nonceGuard(address account_, uint256 nonce_) {
         require(!nonce[account_][nonce_], WishportError.InvalidNonce);
 
         _;
@@ -178,15 +182,16 @@ contract Wishport is Ownable {
         address recoveredSigner = msgHash_.toEthSignedMessageHash().recover(
             sig_
         );
-        // if signer is null address -> use default check
-        if (signer_ == address(0)) {
-            require(
-                recoveredSigner == _authedSigner || recoveredSigner == owner(),
-                WishportError.InvalidSigner
-            );
-        } else {
-            require(recoveredSigner == signer_, WishportError.InvalidSigner);
-        }
+        // if signer is authedSigner -> can allow the signer also be the owner
+        require(
+            recoveredSigner == signer_ ||
+                (
+                    signer_ == authedSigner()
+                        ? recoveredSigner == owner()
+                        : false
+                ),
+            WishportError.InvalidSigner
+        );
         _;
     }
 
@@ -204,6 +209,16 @@ contract Wishport is Ownable {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Public Functions ────────────────────────────────────────────────
 
+    /**
+     * @dev [Metadata]: Get the authed signer address
+     */
+    function authedSigner() public view returns (address) {
+        return _authedSigner;
+    }
+
+    /**
+     * @dev [Assets Management]: Get the configuration of the base ether (default configuration)
+     */
     function assetConfig() public view returns (AssetConfig memory) {
         return _assetConfig[address(0)];
     }
@@ -213,11 +228,9 @@ contract Wishport is Ownable {
      * @param token_ The target token address
      * @return {Registered ERC20 Configuration}
      */
-    function assetConfig(address token_)
-        public
-        view
-        returns (AssetConfig memory)
-    {
+    function assetConfig(
+        address token_
+    ) public view returns (AssetConfig memory) {
         AssetConfig memory config = _assetConfig[token_];
 
         return config.activated ? config : assetConfig();
@@ -275,11 +288,10 @@ contract Wishport is Ownable {
      * * Assign asset_ into _registeredERC20s with the index of the incremented _registeredERC20Count
      * * Assign config_ into _assetConfig with the index of the incremented _registeredERC20Count
      */
-    function setAssetConfig(address token_, AssetConfig memory config_)
-        external
-        onlyOwner
-        assetConfigGuard(token_, config_)
-    {
+    function setAssetConfig(
+        address token_,
+        AssetConfig memory config_
+    ) external onlyOwner assetConfigGuard(token_, config_) {
         _assetConfig[token_] = config_;
     }
 
@@ -297,16 +309,16 @@ contract Wishport is Ownable {
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
      * ! Input sig_ must pass the validation of managerSignatureGuard
-     * ! Input assetId_ & assetAmount_ must pass the validation of mintWishAssetGuard
-     * ! Input tokenId_ must not have corressponding minter record or being minted in wishToken token contract
+     * ! Input tokenId_ must not have been minted before
+     * ! If assetAddress_ is address(0), the msg.value must greater or equal to assetAmount_
      * * Operations:
-     * * Create the corresponding wish information
-     * * Update the mintedWishes in the wish history of _msgSender() with tokenId_
-     * * Increment the mintedWishCount in the wish history of _msgSender()
+     * * If assetAddress_ is not address(0), transfer the asset from _msgSender() to address(this)
+     * * save the corresponding wish reward info
+     * * mint the wish with tokenId_ to the _msgSender()
      */
     function mint(
         uint256 tokenId_,
-        uint256 assetAddress_,
+        address assetAddress_,
         uint256 assetAmount_,
         uint256 nonce_,
         uint256 sigExpireBlockNum_,
@@ -314,13 +326,13 @@ contract Wishport is Ownable {
     )
         external
         payable
-        nonceGuard(nonce_, _msgSender())
+        nonceGuard(_msgSender(), nonce_)
         signatureGuard(
             sig_,
-            address(0),
+            authedSigner(),
             keccak256(
                 abi.encodePacked(
-                    "mint(uint256,uint256,uint256,uint256,uint256,bytes)",
+                    "mint(uint256,address,uint256,uint256,uint256,bytes)",
                     address(this),
                     _msgSender(),
                     tokenId_,
@@ -332,7 +344,31 @@ contract Wishport is Ownable {
             ),
             sigExpireBlockNum_
         )
-    {}
+    {
+        require(
+            _wish.ownerOf(tokenId_) == address(0),
+            WishportError.InvalidToken
+        );
+
+        if (assetAddress_ == address(0)) {
+            require(
+                msg.value >= assetAmount_,
+                WishportError.InsufficientBalance
+            );
+        } else {
+            IERC20 token = IERC20(assetAddress_);
+            token.safeTransferFrom(_msgSender(), address(this), assetAmount_);
+        }
+
+        // save wish reward info
+        WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
+        rewardInfo.token = assetAddress_;
+        rewardInfo.amount = assetAmount_;
+
+        // mint the wish
+        bool success = _wish.mint(_msgSender(), tokenId_);
+        require(success, WishportError.WishTokenError);
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // ─── Burn A Wish ─────────────────────────────────────────────────────────────
@@ -361,10 +397,10 @@ contract Wishport is Ownable {
     )
         external
         payable
-        nonceGuard(nonce_, _msgSender())
+        nonceGuard(_msgSender(), nonce_)
         signatureGuard(
             sig_,
-            address(0),
+            authedSigner(),
             keccak256(
                 abi.encodePacked(
                     "burnWish(uint256,uint256,bytes,uint256)",
@@ -385,4 +421,8 @@ contract Wishport is Ownable {
     // ─────────────────────────────────────────────────────────────────────
     // burn wish
     // handle dispute
+
+    receive() external payable {}
+
+    fallback() external payable {}
 }

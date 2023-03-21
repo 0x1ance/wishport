@@ -27,7 +27,7 @@ interface IWish is IERC721 {
     function completed(uint256 tokenId_) external view returns (bool);
 
     function setManager(address manager_) external;
-    
+
     /**
      * @dev set the token completion status
      *
@@ -36,7 +36,8 @@ interface IWish is IERC721 {
      * - only owner or soul verifiers can mint to address
      * - token has to be minted
      */
-    function setCompleted(uint256 tokenId_, bool status_)
-        external
-        returns (bool);
+    function setCompleted(
+        uint256 tokenId_,
+        bool status_
+    ) external returns (bool);
 }

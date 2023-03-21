@@ -1,10 +1,11 @@
-
+import { UnitParser } from './UnitParser';
 import { ethers } from 'hardhat'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import Chance from 'chance'
 import { LogLevel } from '@ethersproject/logger'
-import { SoulhubManager, Soulbound, Soulhub, Wish, Wishport } from '../../types';
+import { SoulhubManager, Soulbound, Soulhub, Wish, Wishport, Wish__factory } from '../../types';
 import { ZERO_ADDRESS } from '../../ethers-test-helpers'
+import { AssetConfigStruct } from '../../types/contracts/wishport/Wishport';
 
 ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
 const chance = new Chance()
@@ -22,7 +23,6 @@ type SoulboundDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymen
     soulhub?: Soulhub
 }
 
-
 type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
     soulhub?: Soulhub
     soulhubManager?: SoulhubManager
@@ -32,6 +32,13 @@ type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConf
     contractURI?: string
     manager?: string
 }
+
+type WishportDeploymentConfig = ContractDeploymentBaseConfig & Omit<WishDeploymentConfig, 'manager'> & {
+    authedSigner?: string,
+    defaultAssetConfig?: AssetConfigStruct
+}
+
+
 
 class ContractDeployer {
     async SoulhubManager(
@@ -106,6 +113,50 @@ class ContractDeployer {
             manager ?? targetOwner.address
         )
         return [wish, targetSoulhub, targetSoulhubManager, targetOwner] as [
+            Wish,
+            Soulhub,
+            SoulhubManager,
+            SignerWithAddress,
+        ]
+    }
+    async Wishport(
+        {
+            owner,
+            name = chance.string({ length: 8 }),
+            symbol = chance.string({ length: 8 }),
+            uri = chance.domain({ length: 8 }),
+            contractURI = chance.domain({ length: 8 }),
+            soulhub,
+            soulhubManager,
+            authedSigner,
+            defaultAssetConfig = {
+                activated: true,
+                PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 1000000 }),
+                DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 1000000 })
+            }
+        }: WishportDeploymentConfig = {}
+    ) {
+        const [defaultOwner] = await ethers.getSigners()
+        const targetOwner = owner ?? defaultOwner
+        const targetSoulhubManager = soulhubManager ?? (await this.SoulhubManager({ owner: targetOwner }))[0]
+        const targetSoulhub = soulhub ?? (await this.Soulhub({ owner: targetOwner, soulhubManager: targetSoulhubManager, name }))[0]
+        const targeAuthedSigner = authedSigner ?? targetOwner.address
+        const contractFactory = await ethers.getContractFactory('Wishport', {
+        })
+        const wishport = (await contractFactory.connect(targetOwner).deploy(
+            name,
+            symbol,
+            contractURI,
+            uri,
+            targetSoulhub.address,
+            targeAuthedSigner,
+            defaultAssetConfig
+        )) as Wishport
+
+        const wishToken = Wish__factory.connect(await wishport.wish(), targetOwner)
+
+        return [wishport, wishToken, targetSoulhub, targetSoulhubManager, targetOwner] as [
+            Wishport,
             Wish,
             Soulhub,
             SoulhubManager,

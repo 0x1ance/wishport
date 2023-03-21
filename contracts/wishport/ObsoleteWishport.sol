@@ -49,7 +49,7 @@ struct Wish {
     uint256 amount;
 }
 
-contract Wishport is Ownable {
+contract ObsoleteWishport is Ownable {
     using SafeERC20 for IERC20;
     using Address for address;
     // ─── Metadata ────────────────────────────────────────────────────────
