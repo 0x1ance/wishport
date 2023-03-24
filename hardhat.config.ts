@@ -8,14 +8,21 @@ import { env } from './environment'
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: '0.8.17',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: '0.8.17',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true
+        },
       },
-      viaIR: true
-    },
+      {
+        version: '0.4.17'
+      }
+    ],
   },
   namedAccounts: {
     deployer: 0,

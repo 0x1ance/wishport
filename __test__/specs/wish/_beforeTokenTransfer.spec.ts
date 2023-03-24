@@ -1,5 +1,5 @@
 import { contractDeployer } from '../../utils/ContractDeployer';
-import { expectFnReturnChange } from '../../../ethers-test-helpers'
+import { expectFnReturnChange, ParseNumberTypeEnum } from '../../../ethers-test-helpers'
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
@@ -56,5 +56,6 @@ describe('UNIT TEST: Wish Contract - _beforeTokenTransfer', () => {
         expectedAfter: 1
       },
     )
+
   })
 })

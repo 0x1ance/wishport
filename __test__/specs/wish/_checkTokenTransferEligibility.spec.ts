@@ -1,7 +1,7 @@
 
 import { Chance } from 'chance';
 import { contractDeployer } from '../../utils/ContractDeployer';
-import { expectEvent, expectFnReturnChange, expectRevert, ZERO_ADDRESS } from '../../../ethers-test-helpers'
+import { expectEvent, expectFnReturnChange, expectRevert, ParseNumberTypeEnum, ZERO_ADDRESS } from '../../../ethers-test-helpers'
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 

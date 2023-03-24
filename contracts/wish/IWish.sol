@@ -26,6 +26,8 @@ interface IWish is IERC721 {
 
     function completed(uint256 tokenId_) external view returns (bool);
 
+    function pureOwnerOf(uint256 tokenId_) external view returns (address);
+
     function setManager(address manager_) external;
 
     /**

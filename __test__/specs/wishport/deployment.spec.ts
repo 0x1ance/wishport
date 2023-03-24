@@ -4,8 +4,6 @@ import { contractDeployer } from '../../utils/ContractDeployer';
 import { expect } from 'chai'
 import { ethers } from 'hardhat';
 import { expectRevert } from '../../../ethers-test-helpers';
-import { UnitParser } from '../../utils/UnitParser';
-
 
 const chance = new Chance()
 
@@ -40,8 +38,8 @@ describe('UNIT TEST: Wishport Contract - deployment', () => {
 
     const defaultAssetConfig = {
       activated: true,
-      PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 1000000 }),
-      DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 1000000 })
+      PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 10000 }),
+      DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 10000 })
     }
     const [wishport] = await contractDeployer.Wishport({ owner, authedSigner: authedSigner.address, defaultAssetConfig })
 

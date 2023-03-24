@@ -1,10 +1,8 @@
-import { UnitParser } from './UnitParser';
 import { ethers } from 'hardhat'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import Chance from 'chance'
 import { LogLevel } from '@ethersproject/logger'
-import { SoulhubManager, Soulbound, Soulhub, Wish, Wishport, Wish__factory } from '../../types';
-import { ZERO_ADDRESS } from '../../ethers-test-helpers'
+import { SoulhubManager, Soulbound, Soulhub, Wish, Wishport, Wish__factory, TestERC20, TestUSDT__factory, TestUSDT } from '../../types';
 import { AssetConfigStruct } from '../../types/contracts/wishport/Wishport';
 
 ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
@@ -41,6 +39,28 @@ type WishportDeploymentConfig = ContractDeploymentBaseConfig & Omit<WishDeployme
 
 
 class ContractDeployer {
+    async TestERC20({ owner }: ContractDeploymentBaseConfig = {}) {
+        const [defaultOwner] = await ethers.getSigners()
+        const contractFactory = await ethers.getContractFactory('TestERC20')
+        const targetOwner = owner ?? defaultOwner
+        const testerc20 = await contractFactory.connect(targetOwner).deploy(
+        )
+        return [testerc20, targetOwner] as [
+            TestERC20,
+            SignerWithAddress,
+        ]
+    }
+    async TestUSDT({ owner }: ContractDeploymentBaseConfig = {}) {
+        const [defaultOwner] = await ethers.getSigners()
+        const contractFactory = await ethers.getContractFactory('TestUSDT')
+        const targetOwner = owner ?? defaultOwner
+        const testUsdt = await contractFactory.connect(targetOwner).deploy(
+        )
+        return [testUsdt, targetOwner] as [
+            TestUSDT,
+            SignerWithAddress,
+        ]
+    }
     async SoulhubManager(
         { owner }: ContractDeploymentBaseConfig = {}
     ) {
@@ -131,8 +151,8 @@ class ContractDeployer {
             authedSigner,
             defaultAssetConfig = {
                 activated: true,
-                PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 1000000 }),
-                DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 1000000 })
+                PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 10000 }),
+                DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 10000 })
             }
         }: WishportDeploymentConfig = {}
     ) {

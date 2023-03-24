@@ -5,8 +5,14 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "dist",
-    "resolveJsonModule": true,
+    "resolveJsonModule": true
   },
-  "include": ["./scripts", "./__test__", "./types"],
+  "include": [
+    "./scripts",
+    "./__test__",
+    "./types",
+    "./hardhat-test-helpers",
+    "./ethers-test-helpers"
+  ],
   "files": ["./hardhat.config.ts"]
 }

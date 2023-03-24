@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../wish/IWish.sol";
 import "../wish/Wish.sol";
 
+import "hardhat/console.sol";
+
 library WishportError {
     string constant ERC20TransferError = "Wishport:ERC20TransferError";
     string constant InvalidPortion = "Wishport:InvalidPortion";
@@ -24,16 +26,16 @@ library WishportError {
 }
 
 // WishStatusEnum
-// INACTIVE: ownerof == address(0)
-// OUTSTNADING: ownerof != address(0) && completed == FALSE
-// COMPLETED: ownerof != address(0) && completed == TRUE
+// INACTIVE: pureOwnerOf == address(0)
+// OUTSTNADING: pureOwnerOf != address(0) && completed == FALSE
+// COMPLETED: pureOwnerOf != address(0) && completed == TRUE
 enum WishStatusEnum {
     INACTIVE,
     OUTSTANDING,
     COMPLETED
 }
 
-// minter: ownerof when ownerof != address(0)
+// minter: pureOwnerOf when pureOwnerOf != address(0)
 struct WishRewardInfo {
     address token;
     uint256 amount;
@@ -52,6 +54,16 @@ contract Wishport is Ownable {
     using Address for address;
     using ECDSA for bytes32;
 
+    // ─── Events ──────────────────────────────────────────────────────────────────
+
+    event Mint(
+        uint256 indexed tokenId,
+        address indexed rewardToken,
+        uint256 rewardAmount
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────────
+
     // ─── Metadata ────────────────────────────────────────────────────────
 
     IWish _wish; // wishToken
@@ -59,7 +71,7 @@ contract Wishport is Ownable {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constants ───────────────────────────────────────────────────────
 
-    uint256 public constant BASE_PORTION = 1_000_000; // Base Denominator for Portion Calculations
+    uint256 public constant BASE_PORTION = 100_000; // Base Denominator for Portion Calculations
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Variables ───────────────────────────────────────────────────────────────
@@ -345,29 +357,39 @@ contract Wishport is Ownable {
             sigExpireBlockNum_
         )
     {
-        require(
-            _wish.ownerOf(tokenId_) == address(0),
-            WishportError.InvalidToken
-        );
+        // require(
+        //     _wish.pureOwnerOf(tokenId_) == address(0),
+        //     WishportError.InvalidToken
+        // );
 
+        uint256 rewardAmount;
         if (assetAddress_ == address(0)) {
             require(
                 msg.value >= assetAmount_,
                 WishportError.InsufficientBalance
             );
+            rewardAmount = assetAmount_;
         } else {
             IERC20 token = IERC20(assetAddress_);
+            uint256 balanceBefore = token.balanceOf(address(this));
+
             token.safeTransferFrom(_msgSender(), address(this), assetAmount_);
+            uint256 balanceAfter = token.balanceOf(address(this));
+            require(balanceAfter >= balanceBefore, "ERC20 transfer error");
+
+            rewardAmount = balanceAfter - balanceBefore;
         }
 
         // save wish reward info
         WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
         rewardInfo.token = assetAddress_;
-        rewardInfo.amount = assetAmount_;
+        rewardInfo.amount = rewardAmount;
 
         // mint the wish
         bool success = _wish.mint(_msgSender(), tokenId_);
         require(success, WishportError.WishTokenError);
+
+        emit Mint(tokenId_, assetAddress_, rewardAmount);
     }
 
     // ─────────────────────────────────────────────────────────────────────

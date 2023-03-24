@@ -108,6 +108,12 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── external Functions ────────────────────────────────────────────────
 
+
+    function pureOwnerOf(uint256 tokenId_) external view virtual returns (address) {
+        return _ownerOf(tokenId_);
+    }
+
+
     function setBaseURI(string memory uri_) external onlyManager {
         _uri = uri_;
     }
