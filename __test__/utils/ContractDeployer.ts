@@ -8,20 +8,20 @@ import { AssetConfigStruct } from '../../types/contracts/wishport/Wishport';
 ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
 const chance = new Chance()
 
-type ContractDeploymentBaseConfig = {
+export type ContractDeploymentBaseConfig = {
     owner?: SignerWithAddress
 }
 
-type SoulhubDeploymentConfig = ContractDeploymentBaseConfig & {
+export type SoulhubDeploymentConfig = ContractDeploymentBaseConfig & {
     name?: string,
     soulhubManager?: SoulhubManager
 }
 
-type SoulboundDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
+export type SoulboundDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
     soulhub?: Soulhub
 }
 
-type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
+export type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConfig & {
     soulhub?: Soulhub
     soulhubManager?: SoulhubManager
     name?: string,
@@ -31,14 +31,14 @@ type WishDeploymentConfig = ContractDeploymentBaseConfig & SoulhubDeploymentConf
     manager?: string
 }
 
-type WishportDeploymentConfig = ContractDeploymentBaseConfig & Omit<WishDeploymentConfig, 'manager'> & {
+export type WishportDeploymentConfig = ContractDeploymentBaseConfig & Omit<WishDeploymentConfig, 'manager'> & {
     authedSigner?: string,
     defaultAssetConfig?: AssetConfigStruct
 }
 
 
 
-class ContractDeployer {
+export class ContractDeployer {
     async TestERC20({ owner }: ContractDeploymentBaseConfig = {}) {
         const [defaultOwner] = await ethers.getSigners()
         const contractFactory = await ethers.getContractFactory('TestERC20')

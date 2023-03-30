@@ -32,8 +32,8 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      *  Token Management
      */
+    
     mapping(uint256 => bool) public completed; // Mapping from tokenId to completed status, if true then completed
-    mapping(address => uint256) public balanceOfCompleted; // Mapping from address to completed token balance
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constructor ─────────────────────────────────────────────────────────────
@@ -108,11 +108,26 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── external Functions ────────────────────────────────────────────────
 
+    function balanceOfCompleted(
+        address a_
+    ) external view virtual returns (uint256) {
+        uint256 ownerTokenCount = balanceOf(a_);
 
-    function pureOwnerOf(uint256 tokenId_) external view virtual returns (address) {
-        return _ownerOf(tokenId_);
+        uint256 count = 0;
+        for (uint256 i = 0; i < ownerTokenCount; i++) {
+            uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
+            if (completed[currentTokenId]) {
+                count++;
+            }
+        }
+        return count;
     }
 
+    function pureOwnerOf(
+        uint256 tokenId_
+    ) external view virtual returns (address) {
+        return _ownerOf(tokenId_);
+    }
 
     function setBaseURI(string memory uri_) external onlyManager {
         _uri = uri_;
@@ -129,7 +144,9 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      * @dev Returns all the tokens owned by an address
      */
-    function tokensOfOwner(address a_) public view returns (uint256[] memory) {
+    function tokensOfOwner(
+        address a_
+    ) external view returns (uint256[] memory) {
         uint256 ownerTokenCount = balanceOf(a_);
 
         uint256[] memory ownedTokens = new uint256[](ownerTokenCount);
@@ -144,29 +161,26 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      * @dev Returns all the tokens owned by an address
      */
-    function tokensOfOwner(address a_, bool completed_)
-        public
-        view
-        returns (uint256[] memory)
-    {
+    function tokensOfOwner(
+        address a_,
+        bool completed_
+    ) external view returns (uint256[] memory) {
         uint256 ownerTokenCount = balanceOf(a_);
-        uint256 ownerCompletedTokenCount = balanceOfCompleted[a_];
 
-        uint256 tokenCount = completed_
-            ? ownerCompletedTokenCount
-            : (ownerTokenCount - ownerCompletedTokenCount);
+        uint256[] memory filtered = new uint256[](ownerTokenCount);
 
-        uint256[] memory ownedTokens = new uint256[](tokenCount);
-
-        uint256 counter = 0;
+        uint256 targetCount = 0;
         for (uint256 i = 0; i < ownerTokenCount; i++) {
             uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
             if (completed[currentTokenId] == completed_) {
-                ownedTokens[counter++] = currentTokenId;
+                filtered[targetCount++] = currentTokenId;
             }
-            if (counter >= tokenCount) {
-                break;
-            }
+        }
+
+        uint256[] memory ownedTokens = new uint256[](targetCount);
+
+        for (uint256 i = 0; i < targetCount; i++) {
+            ownedTokens[i] = filtered[i];
         }
 
         return ownedTokens;
@@ -180,11 +194,10 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
      * - when the contract is not paused
      * - only owner or soul verifiers can mint to address
      */
-    function mint(address to_, uint256 tokenId_)
-        external
-        onlyOwner
-        returns (bool)
-    {
+    function mint(
+        address to_,
+        uint256 tokenId_
+    ) external onlyOwner returns (bool) {
         _mint(to_, tokenId_);
         return true;
     }
@@ -210,20 +223,13 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
      * - only owner or soul verifiers can mint to address
      * - token has to be minted
      */
-    function setCompleted(uint256 tokenId_, bool status_)
-        external
-        onlyOwner
-        returns (bool)
-    {
+    function setCompleted(
+        uint256 tokenId_,
+        bool status_
+    ) external onlyOwner returns (bool) {
         _requireMinted(tokenId_);
         require(completed[tokenId_] != status_, WishError.SetCompletedError);
-        // if set true, increment the owner completed balance
-        // else decrement the owner completed balance
-        if (status_) {
-            balanceOfCompleted[ownerOf(tokenId_)] += 1;
-        } else {
-            balanceOfCompleted[ownerOf(tokenId_)] -= 1;
-        }
+
         completed[tokenId_] = status_;
         emit SetCompleted(tokenId_, status_);
         return true;
@@ -242,20 +248,14 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         uint256 batchSize_
     ) internal virtual override(ERC721Enumerable, ERC721Soulbound) {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
-        // if token is completed, update the completed balance
-
-        if (from_ != address(0) && completed[tokenId_]) {
-            balanceOfCompleted[from_] -= 1;
-        }
-        if (to_ != address(0) && completed[tokenId_]) {
-            balanceOfCompleted[to_] += 1;
-        }
     }
 
     /**
      * @dev See {IERC165-supportsInterface}
      */
-    function supportsInterface(bytes4 interfaceId_)
+    function supportsInterface(
+        bytes4 interfaceId_
+    )
         public
         view
         virtual

@@ -62,6 +62,8 @@ contract Wishport is Ownable {
         uint256 rewardAmount
     );
 
+    event Burn(uint256 indexed tokenId);
+
     // ─────────────────────────────────────────────────────────────────────────────
 
     // ─── Metadata ────────────────────────────────────────────────────────
@@ -86,7 +88,7 @@ contract Wishport is Ownable {
      *  Assets Management
      */
     mapping(address => AssetConfig) private _assetConfig; // Mapping from asset address to Asset Config, address(0) as the Native Ether
-    mapping(address => mapping(address => uint256)) public clamable; // Mapping from account address to (mapping from token address to account claimable balance, address(0) as native index)
+    mapping(address => mapping(address => uint256)) public claimable; // Mapping from account address to (mapping from token address to account claimable balance, address(0) as native index)
 
     /**
      * Wish Related Information Management
@@ -327,6 +329,7 @@ contract Wishport is Ownable {
      * * If assetAddress_ is not address(0), transfer the asset from _msgSender() to address(this)
      * * save the corresponding wish reward info
      * * mint the wish with tokenId_ to the _msgSender()
+     * * emit Mint event
      */
     function mint(
         uint256 tokenId_,
@@ -357,12 +360,7 @@ contract Wishport is Ownable {
             sigExpireBlockNum_
         )
     {
-        // require(
-        //     _wish.pureOwnerOf(tokenId_) == address(0),
-        //     WishportError.InvalidToken
-        // );
-
-        uint256 rewardAmount;
+        uint256 rewardAmount = 0;
         if (assetAddress_ == address(0)) {
             require(
                 msg.value >= assetAmount_,
@@ -389,6 +387,7 @@ contract Wishport is Ownable {
         bool success = _wish.mint(_msgSender(), tokenId_);
         require(success, WishportError.WishTokenError);
 
+        // emit Mint event
         emit Mint(tokenId_, assetAddress_, rewardAmount);
     }
 
@@ -403,15 +402,14 @@ contract Wishport is Ownable {
      * @param sigExpireBlockNum_ the block number when the signature is expired
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
-     * ! Input sig_ && blockNumber must pass the validation of managerSignatureGuard
-     * ! Input tokenId_ must not have corressponding minter record or being minted in wishToken token contract
+     * ! Input sig_ && sigExpireBlockNum_ must pass the validation of managerSignatureGuard
+     * ! Input tokenId_ must be outstanding wish: owner != address(0) & !completed
      * * Operations:
-     * * remove the corresponding wish information
-     * * Update the mintedWishes in the wish history of _msgSender() with tokenId_
-     * * decrement the mintedWishCount in the wish history of _msgSender()
-     * * transfer the amount to the _msgSender()
+     * * burn the token
+     * * increment the claimable amount of corresponding owner
+     * * reset the token reward info
      */
-    function burnWish(
+    function burn(
         uint256 tokenId_,
         uint256 nonce_,
         bytes memory sig_,
@@ -425,7 +423,7 @@ contract Wishport is Ownable {
             authedSigner(),
             keccak256(
                 abi.encodePacked(
-                    "burnWish(uint256,uint256,bytes,uint256)",
+                    "burn(uint256,uint256,bytes,uint256)",
                     address(this),
                     _msgSender(),
                     tokenId_,
@@ -435,7 +433,32 @@ contract Wishport is Ownable {
             ),
             sigExpireBlockNum_
         )
-    {}
+    {
+        // the token must been actively minted
+        address owner = _wish.pureOwnerOf(tokenId_);
+        require(owner != address(0), WishportError.InvalidToken);
+
+        // the token must not be completed
+        bool completed = _wish.completed(tokenId_);
+        require(!completed, WishportError.Unauthorized);
+
+        // increment the claimable amount of corresponding owner
+        WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
+        claimable[owner][rewardInfo.token] += rewardInfo.amount;
+
+        // reset the token reward info
+        if (rewardInfo.token != address(0)) {
+            rewardInfo.token = address(0);
+        }
+        rewardInfo.amount = 0;
+
+        // burn the corresponding token
+        bool success = _wish.burn(tokenId_);
+        require(success, WishportError.WishTokenError);
+
+        // emit burn event
+        emit Burn(tokenId_);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Create Fulfillment Of A Wish ────────────────────────────────────────────
