@@ -32,6 +32,8 @@ describe('UNIT TEST: Wish Contract - supportsInterface', () => {
     const IWishInterfaceId = generateInterfaceID([
       IWishInterface,
       IERC721Interface,
+      ISoulboundInterface,
+      IERC165Interface
     ])._hex
 
     expect(await wish.supportsInterface(IERC165InterfaceId)).to.be.true

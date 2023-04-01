@@ -38,15 +38,15 @@ describe('UNIT TEST: Wishport Contract - deployment', () => {
 
     const defaultAssetConfig = {
       activated: true,
-      PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 10000 }),
-      DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 10000 })
+      platformFeePortion: chance.integer({ min: 0, max: 10000 }),
+      disputeHandlingFeePortion: chance.integer({ min: 0, max: 10000 })
     }
     const [wishport] = await contractDeployer.Wishport({ owner, authedSigner: authedSigner.address, defaultAssetConfig })
 
     expect(await wishport.authedSigner()).to.equal(authedSigner.address)
     const onchainDefaultAssetConfig = await wishport['assetConfig()']()
-    expect(onchainDefaultAssetConfig.DISPUTE_HANDLING_FEE_PORTION.toNumber()).to.equal(defaultAssetConfig.DISPUTE_HANDLING_FEE_PORTION)
-    expect(onchainDefaultAssetConfig.PLATFORM_FEE_PORTION.toNumber()).to.equal(defaultAssetConfig.PLATFORM_FEE_PORTION)
+    expect(onchainDefaultAssetConfig.disputeHandlingFeePortion.toNumber()).to.equal(defaultAssetConfig.disputeHandlingFeePortion)
+    expect(onchainDefaultAssetConfig.platformFeePortion.toNumber()).to.equal(defaultAssetConfig.platformFeePortion)
     expect(onchainDefaultAssetConfig.activated).to.equal(defaultAssetConfig.activated)
   })
 

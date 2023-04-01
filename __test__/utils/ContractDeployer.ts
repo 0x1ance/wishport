@@ -151,8 +151,8 @@ export class ContractDeployer {
             authedSigner,
             defaultAssetConfig = {
                 activated: true,
-                PLATFORM_FEE_PORTION: chance.integer({ min: 0, max: 10000 }),
-                DISPUTE_HANDLING_FEE_PORTION: chance.integer({ min: 0, max: 10000 })
+                platformFeePortion: chance.integer({ min: 0, max: 100000 }),
+                disputeHandlingFeePortion: chance.integer({ min: 0, max: 100000 })
             }
         }: WishportDeploymentConfig = {}
     ) {

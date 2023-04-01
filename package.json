@@ -38,6 +38,7 @@
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
     "@typechain/ethers-v5": "^10.2.0",
     "@typechain/hardhat": "^6.1.5",
+    "abdk-libraries-solidity": "^3.2.0",
     "chai": "^4.3.7",
     "date-fns": "^2.29.3",
     "decimal.js": "^10.4.3",

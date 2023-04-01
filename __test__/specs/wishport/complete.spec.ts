@@ -11,9 +11,9 @@ import { SafeMath } from '../../utils/safeMath';
 
 const chance = new Chance()
 
-describe('UNIT TEST: Wishport Contract - burn', () => {
+describe('UNIT TEST: Wishport Contract - complete', () => {
   it(`should throw error when the input nonce has already been consumed`, async () => {
-    const [owner, account] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -39,14 +39,16 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
@@ -55,7 +57,8 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       await expectRevert(
         wishport
           .connect(account)
-          .burn(tokenId,
+          .complete(tokenId,
+            fulfiller.address,
             nonce,
             signature,
             sigExpireBlockNum
@@ -68,7 +71,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
   })
   it(`should update the user nonce comsumption status
       `, async () => {
-    const [owner, account] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -84,9 +87,8 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
         assetAmount,
         nonce: nonce++,
         sigExpireBlockNum, minter: account,
-        owner
+        owner,
       })
-
       const signature = await generateSignature({
         signer: owner,
         types: [
@@ -94,23 +96,26 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
       await expectFnReturnChange(
-        wishport.connect(account).burn,
+        wishport.connect(account).complete,
         [
           tokenId,
+          fulfiller.address,
           nonce,
           signature,
           sigExpireBlockNum
@@ -127,7 +132,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
     await ethers.provider.send('evm_revert', [snapshot_id])
   })
   it(`should throw error if the message hash signer is not the authedSigner`, async () => {
-    const [owner, account, authedSigner, unauthedSigner] = await ethers.getSigners()
+    const [owner, account, authedSigner, unauthedSigner, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -146,7 +151,6 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
         authedSigner: authedSigner.address,
         owner
       })
-
       const signature = await generateSignature({
         signer: unauthedSigner,
         types: [
@@ -154,14 +158,16 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
@@ -170,8 +176,9 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       await expectRevert(
         wishport
           .connect(account)
-          .burn(
+          .complete(
             tokenId,
+            fulfiller.address,
             nonce,
             signature,
             sigExpireBlockNum
@@ -182,8 +189,8 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
 
     await ethers.provider.send('evm_revert', [snapshot_id])
   })
-  it(`should allow the burning if the signer is owner but not the authedSigner`, async () => {
-    const [owner, account, authedSigner] = await ethers.getSigners()
+  it(`should allow calling the complete function even if the signer is owner but not the authedSigner`, async () => {
+    const [owner, account, authedSigner, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -194,12 +201,19 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
       const sigExpireBlockNum = currentBlock.number + 10
 
+      const defaultAssetConfig = {
+        activated: true,
+        platformFeePortion: chance.integer({ min: 0, max: 100000 }),
+        disputeHandlingFeePortion: chance.integer({ min: 0, max: 100000 })
+      }
+
       const [wishport] = await contractStateGenerator.afterWishportMint({
         tokenId,
         assetAmount,
         nonce: nonce++,
         sigExpireBlockNum, minter: account,
-        owner, authedSigner: authedSigner.address
+        owner, authedSigner: authedSigner.address,
+        defaultAssetConfig
       })
 
       const signature = await generateSignature({
@@ -209,32 +223,39 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
+      const expectedPlatformFee = SafeMath.div(SafeMath.mul(assetAmount, defaultAssetConfig.platformFeePortion), (await wishport.BASE_PORTION()).toNumber())
       await expectEvent(
-        wishport.connect(account).burn,
+        wishport.connect(account).complete,
         [
           tokenId,
+          fulfiller.address,
           nonce,
           signature,
           sigExpireBlockNum
         ],
         {
           contract: wishport,
-          eventSignature: 'Burn(uint256)',
+          eventSignature: 'Complete(uint256,address,uint256,uint256)',
           eventArgs: {
             tokenId,
+            fulfiller: fulfiller.address,
+            netReward: SafeMath.sub(assetAmount, expectedPlatformFee),
+            platformfee: expectedPlatformFee
           },
         },
       )
@@ -244,7 +265,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
   })
 
   it(`should throw error if the message hash signature has already been expired`, async () => {
-    const [owner, account] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -269,14 +290,16 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
@@ -290,8 +313,9 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       await expectRevert(
         wishport
           .connect(account)
-          .burn(
+          .complete(
             tokenId,
+            fulfiller.address,
             nonce,
             signature,
             sigExpireBlockNum
@@ -304,7 +328,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
   })
 
   it(`should throw error if the token as not been minted`, async () => {
-    const [owner, account] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
     const [wishport, _wish] = await contractDeployer.Wishport({ owner })
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
@@ -322,24 +346,26 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
-
       await expectRevert(
         wishport
           .connect(account)
-          .burn(
+          .complete(
             tokenId,
+            fulfiller.address,
             nonce,
             signature,
             sigExpireBlockNum
@@ -355,10 +381,10 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
 
   it(`
     If the token has been minted in ether
-    should increment the corresponding clamable ether balance of the token owner
-    even if the burner is not token owner
+    should increment the corresponding clamable ether balance of the fulfiller
+    even if the caller is not the fulfiller
   `, async () => {
-    const [owner, account, burner] = await ethers.getSigners()
+    const [owner, account, fulfiller, caller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -369,6 +395,12 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
       const sigExpireBlockNum = currentBlock.number + 10
 
+      const defaultAssetConfig = {
+        activated: true,
+        platformFeePortion: chance.integer({ min: 0, max: 100000 }),
+        disputeHandlingFeePortion: chance.integer({ min: 0, max: 100000 })
+      }
+
       const [wishport] = await contractStateGenerator.afterWishportMint({
         tokenId,
         assetAmount,
@@ -376,6 +408,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
         sigExpireBlockNum,
         minter: account,
         owner,
+        defaultAssetConfig
       })
 
       const signature = await generateSignature({
@@ -385,30 +418,34 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
-          burner.address,
+          caller.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
+      const expectedPlatformFee = SafeMath.div(SafeMath.mul(assetAmount, defaultAssetConfig.platformFeePortion), (await wishport.BASE_PORTION()).toNumber())
 
-      const before = UnitParser.fromEther(await wishport.claimable(account.address, ZERO_ADDRESS))
-      await wishport.connect(burner).burn(tokenId,
+      const before = UnitParser.fromEther(await wishport.claimable(fulfiller.address, ZERO_ADDRESS))
+      await wishport.connect(caller).complete(tokenId,
+        fulfiller.address,
         nonce,
         signature,
         sigExpireBlockNum)
-      const after = UnitParser.fromEther(await wishport.claimable(account.address, ZERO_ADDRESS))
+      const after = UnitParser.fromEther(await wishport.claimable(fulfiller.address, ZERO_ADDRESS))
 
-      expect(burner.address).not.to.equal(account.address)
+      expect(caller.address).not.to.equal(fulfiller.address)
       expect(after).to.be.greaterThan(before)
-      expect(SafeMath.sub(after, before)).to.equal(assetAmount)
+      expect(SafeMath.sub(after, before)).to.equal(SafeMath.sub(assetAmount, expectedPlatformFee))
     }
 
     await ethers.provider.send('evm_revert', [snapshot_id])
@@ -416,10 +453,10 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
 
   it(`
     If the token has been minted in ERC20
-    should increment the corresponding clamable ERC20 balance of the token owner
-    even if the burner is not token owner
+    should increment the corresponding clamable ERC20 balance of the fulfiller
+    even if the caller is not the fulfiller
   `, async () => {
-    const [owner, account, burner] = await ethers.getSigners()
+    const [owner, account, fulfiller, caller] = await ethers.getSigners()
     const [assetToken] = await contractDeployer.TestERC20({ owner })
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -430,6 +467,12 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
       const sigExpireBlockNum = currentBlock.number + 10
 
+      const defaultAssetConfig = {
+        activated: true,
+        platformFeePortion: chance.integer({ min: 0, max: 100000 }),
+        disputeHandlingFeePortion: chance.integer({ min: 0, max: 100000 })
+      }
+
       const [wishport] = await contractStateGenerator.afterWishportMint({
         tokenId,
         assetAmount,
@@ -437,7 +480,8 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
         sigExpireBlockNum,
         minter: account,
         owner,
-        assetToken
+        assetToken,
+        defaultAssetConfig
       })
 
       const signature = await generateSignature({
@@ -447,33 +491,37 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
-          burner.address,
+          caller.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
       const decimals = await assetToken.decimals()
+      const expectedPlatformFee = SafeMath.div(SafeMath.mul(assetAmount, defaultAssetConfig.platformFeePortion), (await wishport.BASE_PORTION()).toNumber())
 
-      const before = UnitParser.fromBigNumber(await wishport.claimable(account.address, assetToken.address), decimals)
+      const before = UnitParser.fromBigNumber(await wishport.claimable(fulfiller.address, assetToken.address), decimals)
 
-      await wishport.connect(burner).burn(tokenId,
+      await wishport.connect(caller).complete(tokenId,
+        fulfiller.address,
         nonce,
         signature,
         sigExpireBlockNum)
 
-      const after = UnitParser.fromBigNumber(await wishport.claimable(account.address, assetToken.address), decimals)
+      const after = UnitParser.fromBigNumber(await wishport.claimable(fulfiller.address, assetToken.address), decimals)
 
-      expect(burner.address).not.to.equal(account.address)
+      expect(caller.address).not.to.equal(fulfiller.address)
       expect(after).to.be.greaterThan(before)
-      expect(SafeMath.sub(after, before)).to.equal(assetAmount)
+      expect(SafeMath.sub(after, before)).to.equal(SafeMath.sub(assetAmount, expectedPlatformFee))
     }
 
     await ethers.provider.send('evm_revert', [snapshot_id])
@@ -484,7 +532,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
     If the token has been minted in ether
     should reset the reward info amount to zero
   `, async () => {
-    const [owner, account] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -511,22 +559,24 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
-
       const before = await wishport.wishRewardInfo(tokenId)
-      await wishport.connect(account).burn(tokenId,
+      await wishport.connect(account).complete(tokenId,
+        fulfiller.address,
         nonce,
         signature,
         sigExpireBlockNum)
@@ -545,7 +595,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
     If the token has been minted in ERC20
     should reset the token address and reward amount in corr. token reward info
   `, async () => {
-    const [owner, account, burner] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
     const [assetToken] = await contractDeployer.TestERC20({ owner })
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -573,14 +623,16 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
-          burner.address,
+          account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
@@ -589,7 +641,8 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       const decimals = await assetToken.decimals()
 
       const before = await wishport.wishRewardInfo(tokenId)
-      await wishport.connect(burner).burn(tokenId,
+      await wishport.connect(account).complete(tokenId,
+        fulfiller.address,
         nonce,
         signature,
         sigExpireBlockNum)
@@ -607,9 +660,9 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
 
 
   it(`
-    should burn the token
+    should set the token status to completed
   `, async () => {
-    const [owner, account, burner] = await ethers.getSigners()
+    const [owner, account, fulfiller] = await ethers.getSigners()
     const [assetToken] = await contractDeployer.TestERC20({ owner })
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
@@ -638,39 +691,41 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
-          burner.address,
+          account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
+      const before = await wish.completed(tokenId)
 
-      const before = await wish.pureOwnerOf(tokenId)
-
-      await wishport.connect(burner).burn(tokenId,
+      await wishport.connect(account).complete(tokenId,
+        fulfiller.address,
         nonce,
         signature,
         sigExpireBlockNum)
 
-      const after = await wish.pureOwnerOf(tokenId)
-      expect(before).to.equal(account.address)
-      expect(after).to.equal(ZERO_ADDRESS)
+      const after = await wish.completed(tokenId)
+      expect(before).to.be.false
+      expect(after).to.be.true
     }
 
     await ethers.provider.send('evm_revert', [snapshot_id])
   })
 
-  // TODO: test scenario: should throw error if burn is not success when calling external erc721 wish token contract
+  // TODO: test scenario: should throw error if setCompleted is not success when calling external erc721 wish token contract
 
-  it(`should emit a Burn event with correct params `, async () => {
-    const [owner, account] = await ethers.getSigners()
+  it(`should emit a Complete event with correct params `, async () => {
+    const [owner, account, fulfiller] = await ethers.getSigners()
 
     const snapshot_id = await ethers.provider.send('evm_snapshot', [])
     {
@@ -681,6 +736,12 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
       const sigExpireBlockNum = currentBlock.number + 10
 
+      const defaultAssetConfig = {
+        activated: true,
+        platformFeePortion: chance.integer({ min: 0, max: 100000 }),
+        disputeHandlingFeePortion: chance.integer({ min: 0, max: 100000 })
+      }
+
       const [wishport] = await contractStateGenerator.afterWishportMint({
         tokenId,
         assetAmount,
@@ -688,6 +749,7 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
         sigExpireBlockNum,
         minter: account,
         owner,
+        defaultAssetConfig
       })
 
       const signature = await generateSignature({
@@ -697,32 +759,39 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           'address',
           'address',
           'uint256',
+          'address',
           'uint256',
           'uint256',
         ],
         values: [
-          "burn(uint256,uint256,bytes,uint256)",
+          "complete(uint256,address,uint256,bytes,uint256)",
           wishport.address,
           account.address,
           tokenId,
+          fulfiller.address,
           nonce,
           sigExpireBlockNum,
         ],
       })
 
+      const expectedPlatformFee = SafeMath.div(SafeMath.mul(assetAmount, defaultAssetConfig.platformFeePortion), (await wishport.BASE_PORTION()).toNumber())
       await expectEvent(
-        wishport.connect(account).burn,
+        wishport.connect(account).complete,
         [
           tokenId,
+          fulfiller.address,
           nonce,
           signature,
           sigExpireBlockNum
         ],
         {
           contract: wishport,
-          eventSignature: 'Burn',
+          eventSignature: 'Complete',
           eventArgs: {
             tokenId,
+            fulfiller: fulfiller.address,
+            netReward: SafeMath.sub(assetAmount, expectedPlatformFee),
+            platformfee: expectedPlatformFee
           },
         },
       )

@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "abdk-libraries-solidity/ABDKMathQuad.sol";
 import "../wish/IWish.sol";
 import "../wish/Wish.sol";
 
@@ -43,10 +44,10 @@ struct WishRewardInfo {
 
 // asset config
 struct AssetConfig {
-    // PLATFORM_FEE_PORTION: e.g. 250_000 for 25% in uint256 basis points (parts per 1_000_000_000)
     bool activated;
-    uint256 PLATFORM_FEE_PORTION;
-    uint256 DISPUTE_HANDLING_FEE_PORTION;
+    // platformFeePortion & disputeHandlingFeePortion: e.g. 25_000 for 25% in uint256 basis points (parts per 100_000)
+    uint256 platformFeePortion;
+    uint256 disputeHandlingFeePortion;
 }
 
 contract Wishport is Ownable {
@@ -63,6 +64,12 @@ contract Wishport is Ownable {
     );
 
     event Burn(uint256 indexed tokenId);
+    event Complete(
+        uint256 indexed tokenId,
+        address indexed fulfiller,
+        uint256 netReward,
+        uint256 platformfee
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -100,16 +107,19 @@ contract Wishport is Ownable {
 
     /**
      * @dev Initialize the smartcontract
+     * @param name_ The name of the Wish token
+     * @param symbol_ The symbol of the Wish token
+     * @param uri_ The initial baseURI of the Wish ERC721 contract
+     * @param soulhub_ The address of the initial soulhub contract the wish erc721soulbound contract is subscribed to
+     * @param authedSigner_ The initial authedsigner
      * @param nativeAssetConfig_ The asset configuration of the native ether of deployed chain
      * ! Requirements:
      * ! Input config_ must pass the validation of portConfigGuard
      * ! Input nativeAssetConfig_ must pass the validation of assetConfigGuard
      * * Operations:
-     * * Initialize the _name metadata
-     * * Initialize the _config metadata
-     * * Initialize the _wishToken metadata
+     * * Deploy the wish token and initialize the _wish metadata
+     * * Initialize the _authedSigner metadata
      * * Initialize the _assetConfig of address(0)
-     * * Initialize the manager status of deployer
      */
     constructor(
         string memory name_,
@@ -130,8 +140,8 @@ contract Wishport is Ownable {
             _msgSender()
         );
         _wish = IWish(address(newWish));
-        _assetConfig[address(0)] = nativeAssetConfig_;
         _authedSigner = authedSigner_;
+        _assetConfig[address(0)] = nativeAssetConfig_;
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -142,8 +152,8 @@ contract Wishport is Ownable {
      * @param config_ The updated erc20 asset config
      * ! Requirements:
      * ! if token_ is address(0), the config.activated must be TRUE
-     * ! Input config_.PLATFORM_FEE_PORTION must equals or less than the BASE_PORTION
-     * ! Input config_.DISPUTE_HANDLING_FEE_PORTION must equals or less than the BASE_PORTION
+     * ! Input config_.platformFeePortion must equals or less than the BASE_PORTION
+     * ! Input config_.disputeHandlingFeePortion must equals or less than the BASE_PORTION
      */
     modifier assetConfigGuard(address token_, AssetConfig memory config_) {
         if (token_ == address(0)) {
@@ -151,8 +161,8 @@ contract Wishport is Ownable {
         }
 
         require(
-            config_.PLATFORM_FEE_PORTION <= BASE_PORTION &&
-                config_.DISPUTE_HANDLING_FEE_PORTION <= BASE_PORTION,
+            config_.platformFeePortion <= BASE_PORTION &&
+                config_.disputeHandlingFeePortion <= BASE_PORTION,
             WishportError.InvalidPortion
         );
         _;
@@ -210,6 +220,31 @@ contract Wishport is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // ─── Pure Functions ──────────────────────────────────────────────────
+
+    function calcPortion(
+        uint256 target_,
+        uint256 numerator_
+    ) private pure returns (uint256 result, uint256 remain) {
+        require(
+            numerator_ <= BASE_PORTION,
+            "PortionCalculation:InvalidNumerator"
+        );
+        uint256 res = ABDKMathQuad.toUInt(
+            ABDKMathQuad.div(
+                ABDKMathQuad.mul(
+                    ABDKMathQuad.fromUInt(target_),
+                    ABDKMathQuad.fromUInt(numerator_)
+                ),
+                ABDKMathQuad.fromUInt(BASE_PORTION)
+            )
+        );
+
+        return (res, target_ - res);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+
     // ─── Internal Functions ──────────────────────────────────────────────────────
 
     /**
@@ -268,7 +303,7 @@ contract Wishport is Ownable {
      * ! The caller must be the owner
      * ! Input account_ must be a valid address
      * * Operations:
-     * * Update the port config with config_
+     * * set the manager for wish token
      */
     function setWishManager(address account_) external onlyOwner {
         _checkAddress(account_);
@@ -276,8 +311,22 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev Set the manager status of an account
-     * @param account_ The target account to be updated with new manager status
+     * @dev Set the subscribed soulhub for wish token
+     * @param soulhub_ The target soulhub address which the wish token will be subscribed to
+     * ! Requirements:
+     * ! The caller must be the owner
+     * ! Input soulhub_ must be a valid address
+     * * Operations:
+     * * Set the subscribed soulhub for wish token
+     */
+    function subscribeSoulhub(address soulhub_) external onlyOwner {
+        _checkAddress(soulhub_);
+        _wish.subscribeSoulhub(soulhub_);
+    }
+
+    /**
+     * @dev Set the authed signer
+     * @param account_ The target authed signer to be set
      * ! Requirements:
      * ! The caller must be the owner
      * ! Input account_ must be a valid address
@@ -322,7 +371,7 @@ contract Wishport is Ownable {
      * @param sig_ The authorization signature signed by the authedSigner
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
-     * ! Input sig_ must pass the validation of managerSignatureGuard
+     * ! Input sig_ must pass the validation of signatureGuard
      * ! Input tokenId_ must not have been minted before
      * ! If assetAddress_ is address(0), the msg.value must greater or equal to assetAmount_
      * * Operations:
@@ -398,11 +447,11 @@ contract Wishport is Ownable {
      * @dev Burn a wish
      * @param tokenId_ The tokenId of the target wish
      * @param nonce_ The target nonce_ of the _msgSender() to be consumed
-     * @param sig_ The authorization signature signed by the contract owner or the managers
+     * @param sig_ The authorization signature signed by the contract owner or the authed signer
      * @param sigExpireBlockNum_ the block number when the signature is expired
      * ! Requirements:
      * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
-     * ! Input sig_ && sigExpireBlockNum_ must pass the validation of managerSignatureGuard
+     * ! Input sig_ && sigExpireBlockNum_ must pass the validation of signatureGuard
      * ! Input tokenId_ must be outstanding wish: owner != address(0) & !completed
      * * Operations:
      * * burn the token
@@ -461,11 +510,87 @@ contract Wishport is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // ─── Create Fulfillment Of A Wish ────────────────────────────────────────────
+    // ─── Complete A Wish ────────────────────────────────────────────
+
+    /**
+     * @dev Complete a wish
+     * @param tokenId_ The tokenId of the target wish
+     * @param fulfiller_ The fulfiller who completed the wish and will receive the reward
+     * @param nonce_ The target nonce_ of the _msgSender() to be consumed
+     * @param sig_ The authorization signature signed by the contract owner or the authed signer
+     * @param sigExpireBlockNum_ the block number when the signature is expired
+     * ! Requirements:
+     * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
+     * ! Input sig_ && sigExpireBlockNum_ must pass the validation of signatureGuard
+     * ! Input tokenId_ must be outstanding wish: owner != address(0) & !completed
+     * * Operations:
+     * * increment the claimable amount of corresponding fulfiller (minus platform fee)
+     * * set the token to completed
+     * * reset the token reward info
+     * * emit Complete event
+     */
+    function complete(
+        uint256 tokenId_,
+        address fulfiller_,
+        uint256 nonce_,
+        bytes memory sig_,
+        uint256 sigExpireBlockNum_
+    )
+        external
+        payable
+        nonceGuard(_msgSender(), nonce_)
+        signatureGuard(
+            sig_,
+            authedSigner(),
+            keccak256(
+                abi.encodePacked(
+                    "complete(uint256,address,uint256,bytes,uint256)",
+                    address(this),
+                    _msgSender(),
+                    tokenId_,
+                    fulfiller_,
+                    nonce_,
+                    sigExpireBlockNum_
+                )
+            ),
+            sigExpireBlockNum_
+        )
+    {
+        // the token must been actively minted
+        address owner = _wish.pureOwnerOf(tokenId_);
+        require(owner != address(0), WishportError.InvalidToken);
+
+        // the token must not be completed
+        bool completed = _wish.completed(tokenId_);
+        require(!completed, WishportError.Unauthorized);
+
+        // increment the claimable amount of corresponding fulfiller
+        WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
+        // get the asset config of corr reward token
+        AssetConfig memory config = assetConfig(rewardInfo.token);
+
+        // calculate the platform fee && reward amount to be incremented to fuliller balance
+        (uint256 platformFee, uint256 netReward) = calcPortion(
+            rewardInfo.amount,
+            config.platformFeePortion
+        );
+        claimable[fulfiller_][rewardInfo.token] += netReward;
+        
+        // reset the token reward info
+        if (rewardInfo.token != address(0)) {
+            rewardInfo.token = address(0);
+        }
+        rewardInfo.amount = 0;
+
+        // update the corresponding wish token to completed
+        bool success = _wish.setCompleted(tokenId_, true);
+        require(success, WishportError.WishTokenError);
+
+        // emit Complete event
+        emit Complete(tokenId_, fulfiller_, netReward, platformFee);
+    }
 
     // ─────────────────────────────────────────────────────────────────────
-    // burn wish
-    // handle dispute
 
     receive() external payable {}
 
