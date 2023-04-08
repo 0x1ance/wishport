@@ -1,4 +1,4 @@
-import { MAX_UINT256, ZERO_ADDRESS } from '../../../ethers-test-helpers/consts';
+import { ZERO_ADDRESS } from '../../../ethers-test-helpers/consts';
 import { Chance } from 'chance';
 import { contractDeployer } from '../../utils/ContractDeployer';
 import { expect } from 'chai'

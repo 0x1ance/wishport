@@ -1,9 +1,7 @@
 
-import { Chance } from 'chance';
 import { contractDeployer } from '../../utils/ContractDeployer';
 import { expectEvent, expectFnReturnChange, expectRevert, ZERO_ADDRESS } from '../../../ethers-test-helpers'
 import { ethers } from 'hardhat';
-import { expect } from 'chai';
 
 describe('UNIT TEST: Wish Contract - setCompleted', () => {
   it(`setCompleted: should throw error if the caller is not owner

@@ -1,7 +1,7 @@
 import { ethers } from 'hardhat'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { LogLevel } from '@ethersproject/logger'
-import { SoulhubManager, Soulhub, Wish, Wishport, Wish__factory, TestERC20, TestUSDT__factory, TestUSDT, ERC20 } from '../../types';
+import { SoulhubManager, Soulhub, Wish, Wishport, TestERC20 } from '../../types';
 import { contractDeployer, WishportDeploymentConfig } from './ContractDeployer';
 import { generateSignature } from '../../hardhat-test-helpers';
 import { UnitParser } from './UnitParser';
