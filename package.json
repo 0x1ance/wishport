@@ -1,14 +1,36 @@
 {
-  "name": "@dooot/wishport",
-  "description": "wishport smart contract",
-  "author": "0x1ance",
+  "name": "@dyut6/wishport",
+  "version": "1.0.0",
+  "description": "wishport smart contract implemented by 0x1ance",
+  "keywords": [
+    "soulbound",
+    "smart contract",
+    "ethereum",
+    "solidity",
+    "dapp",
+    "desoc",
+    "web3",
+    "soul"
+  ],
+  "homepage": "https://github.com/0x1ance/wishport#readme",
+  "bugs": {
+    "url": "https://github.com/0x1ance/wishport/issues"
+  },
   "license": "MIT",
+  "author": {
+    "name": "0x1ance",
+    "email": "tsanglance@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0x1ance/wishport.git"
+  },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "compile": "dotenv -e .env.development -- pnpm hardhat compile",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
-    "slither": "slither ./contracts --solc-remaps '@openzeppelin=node_modules/@openzeppelin @chainlink=node_modules/@chainlink' --exclude naming-convention,external-function,low-level-calls --buidler-ignore-compile",
+    "slither": "slither ./contracts --solc-remaps '@openzeppelin=node_modules/@openzeppelin @chainlink=node_modules/@chainlink @dyut6=node_modules/@dyut6' --exclude naming-convention,external-function,low-level-calls --buidler-ignore-compile",
     "deploy:dev": "dotenv -e .env.development -- hardhat --network bsc_testnet deploy --tags development"
   },
   "devDependencies": {
@@ -27,7 +49,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "@dyut6/soulbound": "^1.0.3",
+    "@dyut6/soulbound": "^1.0.5",
     "@ethersproject/bignumber": "^5.7.0",
     "@ethersproject/bytes": "^5.0.0",
     "@ethersproject/logger": "^5.7.0",

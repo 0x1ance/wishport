@@ -1,4 +1,4 @@
-name: dooot/wishport CI
+name: @dyut6/wishport CI
 
 on:
   - push
