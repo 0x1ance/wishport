@@ -351,7 +351,93 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
     await ethers.provider.send('evm_revert', [snapshot_id])
   })
 
-  // TODO: test scenario: should throw error if the token has been completed
+  it(`should throw error if the token has been completed
+  `, async () => {
+    const [owner, account, fulfiller] = await ethers.getSigners()
+
+    const snapshot_id = await ethers.provider.send('evm_snapshot', [])
+    {
+
+      const tokenId = 0
+      let nonce = 0
+      const assetAmount = chance.integer({ min: 0.02, max: 2000 })
+
+      const [wishport, wish] = await contractStateGenerator.afterWishportMint({
+        tokenId,
+        assetAmount,
+        nonce: nonce++,
+        sigExpireBlockNum: (await getCurrentBlock()).number + 10,
+        minter: account,
+        owner
+      })
+
+      // calling complete first
+      const completeSig = (await generateSignature({
+        signer: owner,
+        types: [
+          'string',
+          'address',
+          'address',
+          'uint256',
+          'address',
+          'uint256',
+          'uint256',
+        ],
+        values: [
+          "complete(uint256,address,uint256,bytes,uint256)",
+          wishport.address,
+          account.address,
+          tokenId,
+          fulfiller.address,
+          nonce,
+          (await getCurrentBlock()).number + 10,
+        ],
+      }))
+      await wishport.connect(account).complete(tokenId,
+        fulfiller.address,
+        nonce++,
+        completeSig,
+        (await getCurrentBlock()).number + 10)
+
+      expect(await wish.completed(tokenId)).to.be.true
+
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+
+      const signature = await generateSignature({
+        signer: owner,
+        types: [
+          'string',
+          'address',
+          'address',
+          'uint256',
+          'uint256',
+          'uint256',
+        ],
+        values: [
+          "burn(uint256,uint256,bytes,uint256)",
+          wishport.address,
+          account.address,
+          tokenId,
+          nonce,
+          sigExpireBlockNum,
+        ],
+      })
+
+
+      await expectRevert(
+        wishport
+          .connect(account)
+          .burn(tokenId,
+            nonce,
+            signature,
+            sigExpireBlockNum
+          ),
+        'Wishport:Unauthorized',
+      )
+
+    }
+    await ethers.provider.send('evm_revert', [snapshot_id])
+  })
 
   it(`
     If the token has been minted in ether
@@ -666,8 +752,6 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
 
     await ethers.provider.send('evm_revert', [snapshot_id])
   })
-
-  // TODO: test scenario: should throw error if burn is not success when calling external erc721 wish token contract
 
   it(`should emit a Burn event with correct params `, async () => {
     const [owner, account] = await ethers.getSigners()

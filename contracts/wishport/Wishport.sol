@@ -67,8 +67,16 @@ contract Wishport is Ownable {
     event Complete(
         uint256 indexed tokenId,
         address indexed fulfiller,
-        uint256 netReward,
+        address indexed rewardToken,
+        uint256 rewardAmount,
         uint256 platformfee
+    );
+    event HandleDispute(
+        uint256 indexed tokenId,
+        address indexed fulfiller,
+        address indexed rewardToken,
+        uint256 rewardAmount,
+        uint256 disputeHandlingFee
     );
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -566,18 +574,17 @@ contract Wishport is Ownable {
 
         // increment the claimable amount of corresponding fulfiller
         WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
-        // get the asset config of corr reward token
-        AssetConfig memory config = assetConfig(rewardInfo.token);
 
         // calculate the platform fee && reward amount to be incremented to fuliller balance
         (uint256 platformFee, uint256 netReward) = calcPortion(
             rewardInfo.amount,
-            config.platformFeePortion
+            assetConfig(rewardInfo.token).platformFeePortion
         );
         claimable[fulfiller_][rewardInfo.token] += netReward;
-        
+
+        address rewardToken = rewardInfo.token;
         // reset the token reward info
-        if (rewardInfo.token != address(0)) {
+        if (rewardToken != address(0)) {
             rewardInfo.token = address(0);
         }
         rewardInfo.amount = 0;
@@ -587,7 +594,119 @@ contract Wishport is Ownable {
         require(success, WishportError.WishTokenError);
 
         // emit Complete event
-        emit Complete(tokenId_, fulfiller_, netReward, platformFee);
+        emit Complete(
+            tokenId_,
+            fulfiller_,
+            rewardToken,
+            netReward,
+            platformFee
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // ─── Handle Wish Dispute ─────────────────────────────────────────────
+
+    /**
+     * @dev Handle a wish dispute
+     * @param tokenId_ The tokenId of the target wish
+     * @param fulfiller_ The fulfiller who completed the wish and will receive the reward
+     * @param rewardPortion_ The portion of reward that the fulfiller will get
+     * @param nonce_ The target nonce_ of the _msgSender() to be consumed
+     * @param sig_ The authorization signature signed by the contract owner or the authed signer
+     * @param sigExpireBlockNum_ the block number when the signature is expired
+     * ! Requirements:
+     * ! Input nonce_ must pass the validation of nonceGuard corresponding to _msgSender()
+     * ! Input sig_ && sigExpireBlockNum_ must pass the validation of signatureGuard
+     * ! Input tokenId_ must be outstanding wish: owner != address(0) & !completed
+     * * Operations:
+     * * calculate the dispute handling fee & net reward amount based on rewardInfo.amount & asset config
+     * * calculate refund amount & reward amount based on rewardPortion_ & net reward amount
+     * * increment the claimable amount of corresponding fulfiller by reward amount
+     * * increment the claimable amount of corresponding owner by refund amount
+     * * reset the token reward info
+     * * If reward portion == 0, burn the corresponding wish token
+     * * If reward portion > 0, set the corresponding wish token to completed
+     * * emit HandleDispute event
+     */
+    function handleDispute(
+        uint256 tokenId_,
+        address fulfiller_,
+        uint256 rewardPortion_,
+        uint256 nonce_,
+        bytes memory sig_,
+        uint256 sigExpireBlockNum_
+    )
+        external
+        payable
+        nonceGuard(_msgSender(), nonce_)
+        signatureGuard(
+            sig_,
+            authedSigner(),
+            keccak256(
+                abi.encodePacked(
+                    "handleDistpute(uint256,address,uint256,uint256,bytes,uint256)",
+                    address(this),
+                    _msgSender(),
+                    tokenId_,
+                    fulfiller_,
+                    rewardPortion_,
+                    nonce_,
+                    sigExpireBlockNum_
+                )
+            ),
+            sigExpireBlockNum_
+        )
+    {
+        // the token must been actively minted
+        address owner = _wish.pureOwnerOf(tokenId_);
+        require(owner != address(0), WishportError.InvalidToken);
+
+        // the token must not be completed
+        bool completed = _wish.completed(tokenId_);
+        require(!completed, WishportError.Unauthorized);
+
+        WishRewardInfo storage rewardInfo = wishRewardInfo[tokenId_];
+        // calculate the dispute handling fee & net reward amount based on rewardInfo.amount & asset config
+        (uint256 disputeHandlingFee, uint256 netReward) = calcPortion(
+            rewardInfo.amount,
+            assetConfig(rewardInfo.token).disputeHandlingFeePortion
+        );
+        // calculate refund amount & reward amount based on rewardPortion_ & net reward amount
+        (uint256 rewardAmount, uint256 refundAmount) = calcPortion(
+            netReward,
+            rewardPortion_
+        );
+        // increment the claimable amount of corresponding fulfiller by reward amount
+        claimable[fulfiller_][rewardInfo.token] += rewardAmount;
+        // increment the claimable amount of corresponding owner by refund amount
+        claimable[owner][rewardInfo.token] += refundAmount;
+
+        address rewardToken = rewardInfo.token;
+
+        // reset the token reward info
+        if (rewardToken != address(0)) {
+            rewardInfo.token = address(0);
+        }
+        rewardInfo.amount = 0;
+
+        // If reward portion == 0, burn the corresponding wish token
+        // If reward portion > 0, set the corresponding wish token to completed
+        bool success = false;
+        if (rewardPortion_ == 0) {
+            success = _wish.burn(tokenId_);
+        } else {
+            success = _wish.setCompleted(tokenId_, true);
+        }
+        require(success, WishportError.WishTokenError);
+
+        // emit HandleDispute event
+        emit HandleDispute(
+            tokenId_,
+            fulfiller_,
+            rewardToken,
+            rewardAmount,
+            disputeHandlingFee
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────
