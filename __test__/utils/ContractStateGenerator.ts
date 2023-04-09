@@ -3,7 +3,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { LogLevel } from '@ethersproject/logger'
 import { SoulhubManager, Soulhub, Wish, Wishport, TestERC20 } from '../../types';
 import { contractDeployer, WishportDeploymentConfig } from './ContractDeployer';
-import { generateSignature } from '../../hardhat-test-helpers';
+import { generateSignature, getCurrentBlock } from '../../hardhat-test-helpers';
 import { UnitParser } from './UnitParser';
 import { ZERO_ADDRESS } from '../../ethers-test-helpers';
 
@@ -16,6 +16,10 @@ type AfterWishportMintProps = WishportDeploymentConfig & {
     nonce: number
     sigExpireBlockNum: number
     minter: SignerWithAddress
+}
+
+type AfterWishportCompleteProps = AfterWishportMintProps & {
+    fulfiller: SignerWithAddress
 }
 
 class ContractStateGenerator {
@@ -84,6 +88,45 @@ class ContractStateGenerator {
 
         return [wishport, wishToken, soulhub, soulhubManager, owner] as [Wishport, Wish, Soulhub, SoulhubManager, SignerWithAddress]
     }
+
+    async afterWishportComplete({ fulfiller, ...props }: AfterWishportCompleteProps) {
+        const [wishport, wishToken, soulhub, soulhubManager, owner] = await this.afterWishportMint(props)
+        const { tokenId, nonce } = props
+
+        const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+        const signature = await generateSignature({
+            signer: owner,
+            types: [
+                'string',
+                'address',
+                'address',
+                'uint256',
+                'address',
+                'uint256',
+                'uint256',
+            ],
+            values: [
+                "complete(uint256,address,uint256,bytes,uint256)",
+                wishport.address,
+                fulfiller.address,
+                tokenId,
+                fulfiller.address,
+                nonce,
+                sigExpireBlockNum,
+            ],
+        })
+
+        await wishport.connect(fulfiller).complete(
+            tokenId,
+            fulfiller.address,
+            nonce,
+            signature,
+            sigExpireBlockNum
+        )
+
+        return [wishport, wishToken, soulhub, soulhubManager, owner] as [Wishport, Wish, Soulhub, SoulhubManager, SignerWithAddress]
+    }
+
 }
 
 export const contractStateGenerator = new ContractStateGenerator();

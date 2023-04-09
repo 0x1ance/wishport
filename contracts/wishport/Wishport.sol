@@ -24,6 +24,8 @@ library WishportError {
     string constant InvalidToken = "Wishport:InvalidToken";
     string constant InsufficientBalance = "Wishport:InsufficientBalance";
     string constant WishTokenError = "Wishport:WishTokenError";
+    string constant SendEtherFailed = "Wishport:SendEtherFailed";
+    string constant ActionDisabled = "Wishport:ActionDisabled";
 }
 
 // WishStatusEnum
@@ -78,12 +80,19 @@ contract Wishport is Ownable {
         uint256 rewardAmount,
         uint256 disputeHandlingFee
     );
+    event Claim(
+        address indexed recipient,
+        address indexed token,
+        uint256 amount
+    );
 
     // ─────────────────────────────────────────────────────────────────────────────
 
     // ─── Metadata ────────────────────────────────────────────────────────
 
     IWish _wish; // wishToken
+    bool public _allowMint = true;
+    bool public _allowClaim = true;
 
     // ─────────────────────────────────────────────────────────────────────────────
     // ─── Constants ───────────────────────────────────────────────────────
@@ -305,6 +314,30 @@ contract Wishport is Ownable {
     }
 
     /**
+     * @dev Set the allowMint status of the contract
+     * @param status_ The target status to be updated
+     * ! Requirements:
+     * ! The caller must be the owner
+     * * Operations:
+     * * set the allowMint status
+     */
+    function allowMint(bool status_) external onlyOwner {
+        _allowMint = status_;
+    }
+
+    /**
+     * @dev Set the allowClaim status of the contract
+     * @param status_ The target status to be updated
+     * ! Requirements:
+     * ! The caller must be the owner
+     * * Operations:
+     * * set the _allowClaim status
+     */
+    function allowClaim(bool status_) external onlyOwner {
+        _allowClaim = status_;
+    }
+
+    /**
      * @dev Set the manager status of an account
      * @param account_ The target account to be updated with new manager status
      * ! Requirements:
@@ -417,6 +450,7 @@ contract Wishport is Ownable {
             sigExpireBlockNum_
         )
     {
+        require(_allowMint, WishportError.ActionDisabled);
         uint256 rewardAmount = 0;
         if (assetAddress_ == address(0)) {
             require(
@@ -710,6 +744,81 @@ contract Wishport is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // ─── Withdraw ──────────────────────────────────────────────────────────
+
+    /**
+     * @dev Withdraw base ether from the contract balance
+     * @param recipient_ The recepient address where the ether would like to be withdrawed to
+     * @param amount_ The withdrawal amount
+     * ! Requirements:
+     * ! The caller must be the owner
+     * ! The the withdraw call must be success
+     */
+    function withdrawEther(
+        address recipient_,
+        uint256 amount_
+    ) external onlyOwner {
+        (bool sent, ) = recipient_.call{value: amount_}("");
+        require(sent, WishportError.SendEtherFailed);
+    }
+
+    /**
+     * @dev Withdraw base ether from the contract balance
+     * @param recipient_ The recepient address where the ether would like to be withdrawed to
+     * @param amount_ The withdrawal amount
+     * ! Requirements:
+     * ! The caller must be the owner
+     * ! The the withdraw call must be success
+     */
+    function withdrawERC20(
+        address recipient_,
+        address tokenAddress_,
+        uint256 amount_
+    ) external onlyOwner {
+        IERC20 token = IERC20(tokenAddress_);
+        token.safeTransfer(recipient_, amount_);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ─── Claim ───────────────────────────────────────────────────
+
+    /**
+     * @dev claim balance from the user's claimable balance
+     * @param recipient_ The recepient address where the ether would like to be withdrawed to
+     * @param tokenAddress_ The token address of the claimable balance
+     * @param amount_ The withdrawal amount
+     * ! REQUIREMENTS:
+     * ! the claimable amount of the caller must be greater than or equal to the input amount
+     * * OPERATIONS:
+     * * decrement the claimable amount of corresponding caller
+     * * if the token address is ZERO_ADDRESS, send ether to the recipient
+     * * if the token address is not ZERO_ADDRESS, send token to the recipient
+     * * emit Claim event
+     */
+    function claim(
+        address recipient_,
+        address tokenAddress_,
+        uint256 amount_
+    ) external {
+        require(_allowClaim, WishportError.ActionDisabled);
+        require(
+            claimable[_msgSender()][tokenAddress_] >= amount_,
+            WishportError.InsufficientBalance
+        );
+        claimable[_msgSender()][tokenAddress_] -= amount_;
+
+        if (tokenAddress_ == address(0)) {
+            (bool sent, ) = recipient_.call{value: amount_}("");
+            require(sent, WishportError.SendEtherFailed);
+        } else {
+            IERC20 token = IERC20(tokenAddress_);
+            token.safeTransfer(recipient_, amount_);
+        }
+
+        emit Claim(recipient_, tokenAddress_, amount_);
+    }
+
+    // ─────────────────────────────────────────────────────────────
 
     receive() external payable {}
 

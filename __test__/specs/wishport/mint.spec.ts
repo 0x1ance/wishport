@@ -10,6 +10,65 @@ import { UnitParser } from '../../utils/UnitParser';
 const chance = new Chance()
 
 describe('UNIT TEST: Wishport Contract - mint', () => {
+  it(`should throw error if the contract does not allow mint`, async () => {
+    const [owner, minter] = await ethers.getSigners()
+    const [wishport, _wish] = await contractDeployer.Wishport({ owner })
+
+    const snapshot_id = await ethers.provider.send('evm_snapshot', [])
+    {
+      const currentBlock = await getCurrentBlock()
+
+      const tokenId = 0
+      const assetAddress = ZERO_ADDRESS
+      const assetAmount_ = chance.integer({ min: 0.02, max: 2000 })
+      const nonce = 0
+      const sigExpireBlockNum = currentBlock.number + 100
+
+      const signature = await generateSignature({
+        signer: owner,
+        types: [
+          'string',
+          'address',
+          'address',
+          'uint256',
+          'address',
+          'uint256',
+          'uint256',
+          'uint256',
+        ],
+        values: [
+          "mint(uint256,address,uint256,uint256,uint256,bytes)",
+          wishport.address,
+          minter.address,
+          tokenId,
+          assetAddress,
+          UnitParser.toEther(assetAmount_),
+          nonce,
+          sigExpireBlockNum,
+        ],
+      })
+
+      await wishport.connect(owner).allowMint(false)
+
+      expect(await wishport._allowMint()).to.be.false
+
+      await expectRevert(
+        wishport
+          .connect(minter)
+          .mint(tokenId,
+            assetAddress,
+            UnitParser.toEther(assetAmount_),
+            nonce,
+            sigExpireBlockNum,
+            signature,
+            { value: UnitParser.toEther(assetAmount_) }
+          ),
+        'Wishport:ActionDisabled',
+      )
+    }
+
+    await ethers.provider.send('evm_revert', [snapshot_id])
+  })
   it(`should throw error when the input nonce has already been consumed`, async () => {
     const [owner, minter] = await ethers.getSigners()
     const [wishport, _wish] = await contractDeployer.Wishport({ owner })
