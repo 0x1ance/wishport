@@ -810,7 +810,6 @@ describe('UNIT TEST: Wishport Contract - burn', () => {
           },
         },
       )
-      await ethers.provider.send('evm_mine', [])
     }
 
     await ethers.provider.send('evm_revert', [snapshot_id])
