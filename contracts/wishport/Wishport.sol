@@ -438,6 +438,7 @@ contract Wishport is Ownable {
             keccak256(
                 abi.encodePacked(
                     "mint(uint256,address,uint256,uint256,uint256,bytes)",
+                    block.chainid,
                     address(this),
                     _msgSender(),
                     tokenId_,
@@ -515,6 +516,7 @@ contract Wishport is Ownable {
             keccak256(
                 abi.encodePacked(
                     "burn(uint256,uint256,bytes,uint256)",
+                    block.chainid,
                     address(this),
                     _msgSender(),
                     tokenId_,
@@ -587,6 +589,7 @@ contract Wishport is Ownable {
             keccak256(
                 abi.encodePacked(
                     "complete(uint256,address,uint256,bytes,uint256)",
+                    block.chainid,
                     address(this),
                     _msgSender(),
                     tokenId_,
@@ -679,6 +682,7 @@ contract Wishport is Ownable {
             keccak256(
                 abi.encodePacked(
                     "handleDistpute(uint256,address,uint256,uint256,bytes,uint256)",
+                    block.chainid,
                     address(this),
                     _msgSender(),
                     tokenId_,
