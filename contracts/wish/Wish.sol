@@ -32,7 +32,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     /**
      *  Token Management
      */
-    
+
     mapping(uint256 => bool) public completed; // Mapping from tokenId to completed status, if true then completed
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     ) internal view virtual override returns (bool) {
         // if its minting || burning: must be soul verifier or owner
         if (from_ == address(0) || to_ == address(0)) {
-            return (_msgSender() == owner());
+            return (_msgSender() == manager || _msgSender() == owner());
         }
 
         // only allow not locked tokens to be transferred under same soul
@@ -197,7 +197,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     function mint(
         address to_,
         uint256 tokenId_
-    ) external onlyOwner returns (bool) {
+    ) external onlyManager returns (bool) {
         _mint(to_, tokenId_);
         return true;
     }
@@ -210,7 +210,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
      * - when the contract is not paused
      * - only owner or soul verifiers can mint to address
      */
-    function burn(uint256 tokenId_) external onlyOwner returns (bool) {
+    function burn(uint256 tokenId_) external onlyManager returns (bool) {
         _burn(tokenId_);
         return true;
     }
@@ -226,7 +226,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
     function setCompleted(
         uint256 tokenId_,
         bool status_
-    ) external onlyOwner returns (bool) {
+    ) external onlyManager returns (bool) {
         _requireMinted(tokenId_);
         require(completed[tokenId_] != status_, WishError.SetCompletedError);
 
