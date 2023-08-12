@@ -67,10 +67,7 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
      * @dev [Metadata] Ensure the message sender is the contract manager
      */
     modifier onlyManager() {
-        require(
-            _msgSender() == manager || _msgSender() == owner(),
-            WishError.UnauthorizedError
-        );
+        require(_msgSender() == manager, WishError.UnauthorizedError);
         _;
     }
 
@@ -96,9 +93,9 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         address to_,
         uint256 tokenId_
     ) internal view virtual override returns (bool) {
-        // if its minting || burning: must be soul verifier or owner
+        // if its minting || burning: must be manager
         if (from_ == address(0) || to_ == address(0)) {
-            return (_msgSender() == manager || _msgSender() == owner());
+            return (_msgSender() == manager);
         }
 
         // only allow not locked tokens to be transferred under same soul
@@ -129,11 +126,11 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
         return _ownerOf(tokenId_);
     }
 
-    function setBaseURI(string memory uri_) external onlyManager {
+    function setBaseURI(string memory uri_) external onlyOwner {
         _uri = uri_;
     }
 
-    function setContractURI(string memory uri_) external onlyManager {
+    function setContractURI(string memory uri_) external onlyOwner {
         _contractURI = uri_;
     }
 

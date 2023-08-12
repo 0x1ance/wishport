@@ -109,7 +109,7 @@ describe('UNIT TEST: Wishport Contract - claim', () => {
       const tokenAddress = ZERO_ADDRESS
       const tokenId = 0
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
-      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 100
 
       const [wishport] = await contractStateGenerator.afterWishportComplete({
         tokenId,
@@ -156,7 +156,7 @@ describe('UNIT TEST: Wishport Contract - claim', () => {
       const tokenAddress = erc20.address
       const tokenId = 0
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
-      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 100
 
       // mint king token for caller
       await erc20
@@ -257,7 +257,7 @@ describe('UNIT TEST: Wishport Contract - claim', () => {
       const tokenAddress = erc20.address
       const tokenId = 0
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
-      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 100
 
       // mint king token for caller
       await erc20
@@ -314,7 +314,7 @@ describe('UNIT TEST: Wishport Contract - claim', () => {
       const tokenAddress = erc20.address
       const tokenId = 0
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
-      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 100
 
       // mint king token for caller
       await erc20
@@ -373,7 +373,7 @@ describe('UNIT TEST: Wishport Contract - claim', () => {
       const tokenAddress = erc20.address
       const tokenId = 0
       const assetAmount = chance.integer({ min: 0.02, max: 2000 })
-      const sigExpireBlockNum = (await getCurrentBlock()).number + 10
+      const sigExpireBlockNum = (await getCurrentBlock()).number + 100
 
       // mint king token for caller
       await erc20
