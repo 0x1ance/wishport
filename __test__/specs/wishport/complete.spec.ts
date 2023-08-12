@@ -605,7 +605,7 @@ describe("UNIT TEST: Wishport Contract - complete", () => {
       const tokenId = 0;
       let nonce = 0;
       const assetAmount = chance.integer({ min: 0.02, max: 2000 });
-      const sigExpireBlockNum = currentBlock.number + 10;
+      const sigExpireBlockNum = currentBlock.number + 100;
 
       const defaultAssetConfig = {
         activated: true,
@@ -768,7 +768,7 @@ describe("UNIT TEST: Wishport Contract - complete", () => {
       const tokenId = 0;
       let nonce = 0;
       const assetAmount = chance.integer({ min: 0.02, max: 2000 });
-      const sigExpireBlockNum = currentBlock.number + 10;
+      const sigExpireBlockNum = currentBlock.number + 100;
 
       const [wishport] = await contractStateGenerator.afterWishportMint({
         tokenId,
@@ -843,7 +843,7 @@ describe("UNIT TEST: Wishport Contract - complete", () => {
       const tokenId = 0;
       let nonce = 0;
       const assetAmount = chance.integer({ min: 0.02, max: 2000 });
-      const sigExpireBlockNum = currentBlock.number + 10;
+      const sigExpireBlockNum = currentBlock.number + 100;
 
       const [wishport, wish] = await contractStateGenerator.afterWishportMint({
         tokenId,

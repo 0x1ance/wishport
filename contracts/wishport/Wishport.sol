@@ -124,39 +124,24 @@ contract Wishport is Ownable {
 
     /**
      * @dev Initialize the smartcontract
-     * @param name_ The name of the Wish token
-     * @param symbol_ The symbol of the Wish token
-     * @param uri_ The initial baseURI of the Wish ERC721 contract
-     * @param soulhub_ The address of the initial soulhub contract the wish erc721soulbound contract is subscribed to
+     * @param wish_ The controlled wish contract
      * @param authedSigner_ The initial authedsigner
      * @param nativeAssetConfig_ The asset configuration of the native ether of deployed chain
      * ! Requirements:
      * ! Input config_ must pass the validation of portConfigGuard
      * ! Input nativeAssetConfig_ must pass the validation of assetConfigGuard
      * * Operations:
-     * * Deploy the wish token and initialize the _wish metadata
+     * * Initialize the _wish metadata
      * * Initialize the _authedSigner metadata
      * * Initialize the _assetConfig of address(0)
      */
     constructor(
-        string memory name_,
-        string memory symbol_,
-        string memory contractURI_,
-        string memory uri_,
-        address soulhub_,
+        address wish_,
         address authedSigner_,
         AssetConfig memory nativeAssetConfig_
     ) assetConfigGuard(address(0), nativeAssetConfig_) {
         require(authedSigner_ != address(0), WishportError.InvalidSigner);
-        Wish newWish = new Wish(
-            name_,
-            symbol_,
-            contractURI_,
-            uri_,
-            soulhub_,
-            _msgSender()
-        );
-        _wish = IWish(address(newWish));
+        _wish = IWish(wish_);
         _authedSigner = authedSigner_;
         _assetConfig[address(0)] = nativeAssetConfig_;
     }
@@ -261,18 +246,6 @@ contract Wishport is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-
-    // ─── Internal Functions ──────────────────────────────────────────────────────
-
-    /**
-     * @dev Throw error if the address is invalid
-     * @param account_ The target address to be checked
-     */
-    function _checkAddress(address account_) internal pure {
-        require(account_ != address(0), WishportError.InvalidAddress);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
     // ─── Public Functions ────────────────────────────────────────────────
 
     /**
@@ -338,34 +311,6 @@ contract Wishport is Ownable {
     }
 
     /**
-     * @dev Set the manager status of an account
-     * @param account_ The target account to be updated with new manager status
-     * ! Requirements:
-     * ! The caller must be the owner
-     * ! Input account_ must be a valid address
-     * * Operations:
-     * * set the manager for wish token
-     */
-    function setWishManager(address account_) external onlyOwner {
-        _checkAddress(account_);
-        _wish.setManager(account_);
-    }
-
-    /**
-     * @dev Set the subscribed soulhub for wish token
-     * @param soulhub_ The target soulhub address which the wish token will be subscribed to
-     * ! Requirements:
-     * ! The caller must be the owner
-     * ! Input soulhub_ must be a valid address
-     * * Operations:
-     * * Set the subscribed soulhub for wish token
-     */
-    function subscribeSoulhub(address soulhub_) external onlyOwner {
-        _checkAddress(soulhub_);
-        _wish.subscribeSoulhub(soulhub_);
-    }
-
-    /**
      * @dev Set the authed signer
      * @param account_ The target authed signer to be set
      * ! Requirements:
@@ -375,7 +320,7 @@ contract Wishport is Ownable {
      * * Update the port config with config_
      */
     function setAuthedSigner(address account_) external onlyOwner {
-        _checkAddress(account_);
+        require(account_ != address(0), WishportError.InvalidAddress);
         _authedSigner = account_;
     }
 
