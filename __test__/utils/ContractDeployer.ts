@@ -14,6 +14,7 @@ import {
   TestUSDT,
 } from "../../types";
 import { AssetConfigStruct } from "../../types/contracts/wishport/Wishport";
+import { ZERO_ADDRESS } from "../../ethers-test-helpers";
 
 ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
 const chance = new Chance();
@@ -47,6 +48,7 @@ export type WishportDeploymentConfig = ContractDeploymentBaseConfig &
   Omit<WishDeploymentConfig, "manager"> & {
     authedSigner?: string;
     defaultAssetConfig?: AssetConfigStruct;
+    trustedForwarder?: string;
   };
 
 export class ContractDeployer {
@@ -174,6 +176,7 @@ export class ContractDeployer {
     soulhub,
     soulhubManager,
     authedSigner,
+    trustedForwarder,
     defaultAssetConfig = {
       activated: true,
       platformFeePortion: chance.integer({ min: 0, max: 100000 }),
@@ -208,7 +211,12 @@ export class ContractDeployer {
 
     const wishport = (await contractFactory
       .connect(targetOwner)
-      .deploy(wish.address, targeAuthedSigner, defaultAssetConfig)) as Wishport;
+      .deploy(
+        wish.address,
+        targeAuthedSigner,
+        defaultAssetConfig,
+        trustedForwarder ?? ZERO_ADDRESS
+      )) as Wishport;
 
     await wish.connect(targetOwner).setManager(wishport.address);
 
