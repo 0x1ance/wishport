@@ -2,6 +2,9 @@
   "name": "@dyut6/wishport",
   "version": "1.0.4",
   "description": "wishport smart contract implemented by 0x1ance",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "keywords": [
     "soulbound",
     "smart contract",
