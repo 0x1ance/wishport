@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
 import "../wish/IWish.sol";
 import "../wish/Wish.sol";
@@ -52,7 +53,7 @@ struct AssetConfig {
     uint256 disputeHandlingFeePortion;
 }
 
-contract Wishport is Ownable {
+contract Wishport is ERC2771Context, Ownable {
     using SafeERC20 for IERC20;
     using Address for address;
     using ECDSA for bytes32;
@@ -138,8 +139,12 @@ contract Wishport is Ownable {
     constructor(
         address wish_,
         address authedSigner_,
-        AssetConfig memory nativeAssetConfig_
-    ) assetConfigGuard(address(0), nativeAssetConfig_) {
+        AssetConfig memory nativeAssetConfig_,
+        address trustedForwarder_
+    )
+        assetConfigGuard(address(0), nativeAssetConfig_)
+        ERC2771Context(trustedForwarder_)
+    {
         require(authedSigner_ != address(0), WishportError.InvalidSigner);
         _wish = IWish(wish_);
         _authedSigner = authedSigner_;
@@ -768,6 +773,24 @@ contract Wishport is Ownable {
     }
 
     // ─────────────────────────────────────────────────────────────
+
+    function _msgSender()
+        internal
+        view
+        override(Context, ERC2771Context)
+        returns (address sender)
+    {
+        sender = ERC2771Context._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(Context, ERC2771Context)
+        returns (bytes calldata)
+    {
+        return ERC2771Context._msgData();
+    }
 
     receive() external payable {}
 
