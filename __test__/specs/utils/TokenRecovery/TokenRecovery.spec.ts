@@ -210,7 +210,7 @@ describe("TokenRecovery", () => {
         "OwnableUnauthorizedAccount"
       );
     });
-    it('should throw error when the "receivers", "tokens" and "amounts" length are not equal', async () => {
+    it('should throw error when the "receivers" and "tokens" length are not equal', async () => {
       // Arrange
       const [deployer] = await ethers.getSigners();
       const [tokenRecovery] = await ContractDeployer.TokenRecovery({
@@ -233,6 +233,38 @@ describe("TokenRecovery", () => {
             [faker.finance.ethereumAddress(), faker.finance.ethereumAddress()],
             [await testERC20.getAddress()],
             [UnitParser.toBigNumber(amount, testERC20Decimal)]
+          )
+      ).to.be.revertedWithCustomError(
+        tokenRecovery,
+        "TokenRecoveryInconsistentArrays"
+      );
+    });
+    it('should throw error when the "receivers" and "amounts" length are not equal', async () => {
+      // Arrange
+      const [deployer] = await ethers.getSigners();
+      const [tokenRecovery] = await ContractDeployer.TokenRecovery({
+        deployer,
+      });
+      const [testERC20] = await ContractDeployer.Token.ERC20();
+      const testERC20Decimal = await testERC20.decimals();
+
+      // Act
+      const amount = faker.number.int({
+        min: 1,
+        max: 1000,
+      });
+
+      // Assert
+      await expect(
+        tokenRecovery
+          .connect(deployer)
+          .recoverERC20s(
+            [faker.finance.ethereumAddress()],
+            [await testERC20.getAddress()],
+            [
+              UnitParser.toBigNumber(amount, testERC20Decimal),
+              UnitParser.toBigNumber(amount, testERC20Decimal),
+            ]
           )
       ).to.be.revertedWithCustomError(
         tokenRecovery,
@@ -411,7 +443,7 @@ describe("TokenRecovery", () => {
         "OwnableUnauthorizedAccount"
       );
     });
-    it('should throw error when the "receivers", "tokens" and "tokenIds" length are not equal', async () => {
+    it('should throw error when the "receivers" and "tokens" length are not equal', async () => {
       // Arrange
       const [deployer] = await ethers.getSigners();
       const [tokenRecovery] = await ContractDeployer.TokenRecovery({
@@ -430,6 +462,31 @@ describe("TokenRecovery", () => {
             [faker.finance.ethereumAddress(), faker.finance.ethereumAddress()],
             [await testERC721.getAddress()],
             [tokenId]
+          )
+      ).to.be.revertedWithCustomError(
+        tokenRecovery,
+        "TokenRecoveryInconsistentArrays"
+      );
+    });
+    it('should throw error when the "receivers" and "tokenIds" length are not equal', async () => {
+      // Arrange
+      const [deployer] = await ethers.getSigners();
+      const [tokenRecovery] = await ContractDeployer.TokenRecovery({
+        deployer,
+      });
+      const [testERC721] = await ContractDeployer.Token.ERC721();
+      const tokenId = 1;
+
+      // Act
+
+      // Assert
+      await expect(
+        tokenRecovery
+          .connect(deployer)
+          .recoverERC721s(
+            [faker.finance.ethereumAddress()],
+            [await testERC721.getAddress()],
+            [tokenId, tokenId]
           )
       ).to.be.revertedWithCustomError(
         tokenRecovery,

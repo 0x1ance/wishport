@@ -12,8 +12,6 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
 import "../wish/IWish.sol";
 import "../wish/Wish.sol";
 
-import "hardhat/console.sol";
-
 library WishportError {
     string constant ERC20TransferError = "Wishport:ERC20TransferError";
     string constant InvalidPortion = "Wishport:InvalidPortion";

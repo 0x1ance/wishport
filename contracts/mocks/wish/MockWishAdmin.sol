@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {IWish} from "../../wish/IWish.sol";
-import "hardhat/console.sol";
 
 contract MockWishAdmin {
     IWish public immutable WISH_INVENTORY;
@@ -18,7 +17,6 @@ contract MockWishAdmin {
     function testMint(address to_, uint256 tokenId_) external {
         mintResult = "0x";
         bytes4 receipt = WISH_INVENTORY.mint(to_, tokenId_);
-        console.log("mintResult: %s", string(abi.encodePacked(receipt)));
         mintResult = receipt;
     }
 

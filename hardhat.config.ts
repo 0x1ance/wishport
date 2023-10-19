@@ -5,6 +5,7 @@ import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "hardhat-deploy";
 import "hardhat-gas-reporter";
+import "solidity-coverage";
 import { env } from "./environment";
 import "tsconfig-paths/register";
 
@@ -21,7 +22,7 @@ const config: HardhatUserConfig = {
               yul: true,
             },
           },
-          viaIR: true,
+          // viaIR: true,
         },
       },
     ],

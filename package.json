@@ -6,14 +6,12 @@
     "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
-    "soulbound",
     "smart contract",
     "ethereum",
     "solidity",
     "dapp",
-    "desoc",
     "web3",
-    "soul"
+    "nft"
   ],
   "homepage": "https://github.com/0x1ance/wishport#readme",
   "bugs": {
@@ -32,8 +30,8 @@
     "preinstall": "npx only-allow pnpm",
     "compile": "dotenv -e .env.development -- pnpm hardhat compile",
     "clean": "rm -rf .turbo node_modules",
-    "test": "hardhat test",
-    "coverage": "hardhat coverage",
+    "test": "REPORT_GAS=true hardhat test",
+    "coverage": "hardhat coverage --temp build",
     "slither:wish": "slither ./contracts/wish --solc-remaps '@openzeppelin=node_modules/@openzeppelin @chainlink=node_modules/@chainlink' --exclude naming-convention,external-function,low-level-calls --buidler-ignore-compile",
     "deploy:dev": "dotenv -e .env.development -- hardhat --network bsc_testnet deploy --tags development"
   },
