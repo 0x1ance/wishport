@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.20;
 
 library OptimizedMath {
   function fullMul(uint256 x_, uint256 y_) public pure returns (uint256 l, uint256 h) {

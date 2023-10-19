@@ -1,16 +1,18 @@
 import { HardhatUserConfig } from 'hardhat/config'
 import '@nomicfoundation/hardhat-toolbox'
-import '@nomiclabs/hardhat-ethers'
 import '@typechain/hardhat'
+import '@nomicfoundation/hardhat-ethers'
+import '@nomicfoundation/hardhat-chai-matchers'
 import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import { env } from './environment'
+import "tsconfig-paths/register";
 
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.17',
+        version: '0.8.20',
         settings: {
           optimizer: {
             enabled: true,
@@ -59,7 +61,7 @@ const config: HardhatUserConfig = {
   },
   typechain: {
     outDir: './types',
-    target: 'ethers-v5',
+    target: 'ethers-v6',
     alwaysGenerateOverloads: false,
     externalArtifacts: ['externalArtifacts/*.json'],
     dontOverrideCompile: false,

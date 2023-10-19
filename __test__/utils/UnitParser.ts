@@ -1,19 +1,18 @@
-import { ethers } from 'ethers'
-import { BigNumber } from '@ethersproject/bignumber'
+import { ethers } from "ethers";
 
-const toBigNumber = (num: number, hex: number = 18) =>
-  ethers.utils.parseUnits(num.toString(), hex)
+const toBigNumber = (num: number, hex: string | number | bigint = 18) =>
+  ethers.parseUnits(num.toString(), hex);
 
-const fromBigNumber = (bigNum: BigNumber, hex: number = 18) =>
-  +ethers.utils.formatUnits(bigNum, hex)
+const fromBigNumber = (bigNum: bigint, hex: string | number | bigint = 18) =>
+  +ethers.formatUnits(bigNum, hex);
 
-const toEther = (num: number) => ethers.utils.parseEther(num.toString())
+const toEther = (num: number) => ethers.parseEther(num.toString());
 
-const fromEther = (ether: BigNumber) => Number(ethers.utils.formatEther(ether))
+const fromEther = (ether: bigint) => Number(ethers.formatEther(ether));
 
 export const UnitParser = {
   toBigNumber,
   fromBigNumber,
   toEther,
   fromEther,
-}
+};

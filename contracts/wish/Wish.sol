@@ -1,78 +1,113 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@dyut6/soulbound/contracts/sbt/ERC721Soulbound/ERC721Soulbound.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "./IWish.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {TokenRecovery} from "../utils/TokenRecovery.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {IWish} from "./IWish.sol";
 
-library WishError {
-    string constant SetCompletedError = "Wish:SetCompletedError";
-    string constant UnauthorizedError = "Wish:Unauthorized";
-    string constant InvalidAddress = "Wish:InvalidAddress";
-}
+/**
+ * @title Wish Contract
+ * @dev Contract for managing ERC721 tokens with additional features.
+ * Implements the {ERC721}, {Ownable}, {AccessControl}, and {TokenRecovery} contracts.
+ */
+contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
+    using Strings for uint256;
 
-// conditional soul bound
-contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
-    // ─── Events ──────────────────────────────────────────────────────────────────
+    /// @dev URI for the contract metadata (for OPENSEA)
+    string public contractURI;
 
-    event SetCompleted(uint256 indexed tokenId_, bool status);
+    /// @dev Base URI of the ERC721 token metadata
+    string public baseURI;
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // ─── Metadata ────────────────────────────────────────────────────────
+    /// @dev Mapping from tokenId to completion status, true is completed
+    mapping(uint256 => bool) private _completions;
 
-    string private _contractURI; // uri for the contract metadata (for OPENSEA)
-    string private _uri; // baseURI of the ERC721 token metadata
-    address public manager; // address of the contract manager
-
-    // ─────────────────────────────────────────────────────────────────────
-    // ─── Variables ───────────────────────────────────────────────────────────────
-
-    /**
-     *  Token Management
-     */
-
-    mapping(uint256 => bool) public completed; // Mapping from tokenId to completed status, if true then completed
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // ─── Constructor ─────────────────────────────────────────────────────────────
+    /// @dev Role for admin users
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes4 public constant MINT_SELECTOR = IWish.mint.selector;
+    bytes4 public constant BURN_SELECTOR = IWish.burn.selector;
+    bytes4 public constant COMPLETE_SELECTOR = IWish.complete.selector;
 
     /**
-     * @param name_ The name of the ERC721Soulbound token
-     * @param symbol_ The symbol of the ERC721Soulbound token
-     * @param uri_ The initial baseURI of the ERC721 contract
-     * @param soulhub_ The address of the initial soulhub contract this contract is subscribed to
-     * * Operations:
-     * * Initialize the _uri metadata
+     * @dev Initializes the contract by setting the metadata URIs, the initial admin, and granting roles.
+     * @dev Set the contract metadata uri
+     * @dev Set the contract base uri
+     * @dev Setup default admin role
+     * @dev Set the contract manager
+     *
+     * Requirements:
+     *
+     * - The initial admin addres cannot be the zero address
+     *
+     * @param name_ The name of the ERC721 token
+     * @param symbol_ The symbol of the ERC721 token
+     * @param contractURI_ The contract metadata URI
+     * @param uri The base URI of the ERC721 token metadata
      */
     constructor(
         string memory name_,
         string memory symbol_,
         string memory contractURI_,
-        string memory uri_,
-        address soulhub_,
-        address manager_
-    ) ERC721Soulbound(name_, symbol_, soulhub_) {
-        require(manager_ != address(0), WishError.InvalidAddress);
-        _contractURI = contractURI_;
-        _uri = uri_;
-        manager = manager_;
+        string memory uri
+    ) ERC721(name_, symbol_) Ownable(_msgSender()) {
+        contractURI = contractURI_;
+        baseURI = uri;
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // ─── Modifiers ───────────────────────────────────────────────────────
 
     /**
-     * @dev [Metadata] Ensure the message sender is the contract manager
+     * @dev Decomposes the token ID into the original token ID and the owner address.
+     * @param tokenId The token ID to decompose
+     * @return decomposedTokenId The original token ID
+     * @return owner The owner's address
      */
-    modifier onlyManager() {
-        require(_msgSender() == manager, WishError.UnauthorizedError);
-        _;
+    function _decomposeTokenId(
+        uint256 tokenId
+    ) internal view returns (uint256 decomposedTokenId, address owner) {
+        if (tokenId > 2 ** 96) {
+            decomposedTokenId = tokenId & ((1 << 96) - 1);
+            owner = super._ownerOf(decomposedTokenId);
+            if (owner == address(0)) {
+                owner = address(uint160(uint256(tokenId >> 96)));
+            }
+        } else {
+            decomposedTokenId = tokenId;
+            owner = super._ownerOf(decomposedTokenId);
+        }
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // ─── Internal Functions ──────────────────────────────────────────────────────
+    /**
+     * @dev Sets the contract metadata Uniform Resource Identifier (URI)
+     *
+     * Requirements:
+     *xr
+     * - Only owner can set the contractURI
+     *
+     * @param uri The new URI to set
+     */
+    function setContractURI(string memory uri) external onlyOwner {
+        contractURI = uri;
+    }
+
+    /**
+     * @dev Sets the base URI for all token IDs. It is automatically added as a prefix to the value returned
+     * in {tokenURI}, or to the token ID if {tokenURI} is empty.
+     *
+     * Requirements:
+     *
+     * - Only owner can set the baseURI
+     *
+     * @param uri The base URI to set
+     */
+    function setBaseURI(string memory uri) external onlyOwner {
+        baseURI = uri;
+    }
 
     /**
      * @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
@@ -81,188 +116,212 @@ contract Wish is ERC721Soulbound, ERC721Enumerable, IWish {
      * @return {BaseURI}
      */
     function _baseURI() internal view virtual override returns (string memory) {
-        return _uri;
-    }
-
-    function contractURI() public view returns (string memory) {
-        return _contractURI;
-    }
-
-    function _checkTokenTransferEligibility(
-        address from_,
-        address to_,
-        uint256 tokenId_
-    ) internal view virtual override returns (bool) {
-        // if its minting || burning: must be manager
-        if (from_ == address(0) || to_ == address(0)) {
-            return (_msgSender() == manager);
-        }
-
-        // only allow not locked tokens to be transferred under same soul
-        return completed[tokenId_] && _checkSameSoul(from_, to_);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // ─── external Functions ────────────────────────────────────────────────
-
-    function balanceOfCompleted(
-        address a_
-    ) external view virtual returns (uint256) {
-        uint256 ownerTokenCount = balanceOf(a_);
-
-        uint256 count = 0;
-        for (uint256 i = 0; i < ownerTokenCount; i++) {
-            uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
-            if (completed[currentTokenId]) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    function pureOwnerOf(
-        uint256 tokenId_
-    ) external view virtual returns (address) {
-        return _ownerOf(tokenId_);
-    }
-
-    function setBaseURI(string memory uri_) external onlyOwner {
-        _uri = uri_;
-    }
-
-    function setContractURI(string memory uri_) external onlyOwner {
-        _contractURI = uri_;
-    }
-
-    function setManager(address manager_) external onlyOwner {
-        manager = manager_;
+        return baseURI;
     }
 
     /**
-     * @dev Returns all the tokens owned by an address
+     * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
+     * @param tokenId The token ID to get the URI of
+     * @return The URI of the token
      */
-    function tokensOfOwner(
-        address a_
-    ) external view returns (uint256[] memory) {
-        uint256 ownerTokenCount = balanceOf(a_);
+    function tokenURI(
+        uint256 tokenId
+    ) public view virtual override(ERC721) returns (string memory) {
+        (uint256 decomposedTokenId, address owner) = _decomposeTokenId(tokenId);
 
-        uint256[] memory ownedTokens = new uint256[](ownerTokenCount);
-
-        for (uint256 i = 0; i < ownerTokenCount; i++) {
-            ownedTokens[i] = tokenOfOwnerByIndex(a_, i);
+        if (owner == address(0)) {
+            revert ERC721NonexistentToken(decomposedTokenId);
         }
 
-        return ownedTokens;
+        string memory uri = _baseURI();
+        return
+            bytes(uri).length > 0
+                ? string.concat(uri, decomposedTokenId.toString())
+                : "";
     }
 
     /**
-     * @dev Returns all the tokens owned by an address
+     * @dev Overridden version of ownerOf from ERC721. Decomposes the token ID to return the correct owner.
+     * @param tokenId The token ID to get the owner of
+     * @return owner The owner of the token
      */
-    function tokensOfOwner(
-        address a_,
-        bool completed_
-    ) external view returns (uint256[] memory) {
-        uint256 ownerTokenCount = balanceOf(a_);
-
-        uint256[] memory filtered = new uint256[](ownerTokenCount);
-
-        uint256 targetCount = 0;
-        for (uint256 i = 0; i < ownerTokenCount; i++) {
-            uint256 currentTokenId = tokenOfOwnerByIndex(a_, i);
-            if (completed[currentTokenId] == completed_) {
-                filtered[targetCount++] = currentTokenId;
-            }
-        }
-
-        uint256[] memory ownedTokens = new uint256[](targetCount);
-
-        for (uint256 i = 0; i < targetCount; i++) {
-            ownedTokens[i] = filtered[i];
-        }
-
-        return ownedTokens;
+    function ownerOf(
+        uint256 tokenId
+    ) public view virtual override(ERC721) returns (address owner) {
+        (, owner) = _decomposeTokenId(tokenId);
     }
 
     /**
-     * @dev mint the token
+     * @dev Mint the token and returns the function selector if successful.
      *
      * Requirements:
      *
-     * - when the contract is not paused
-     * - only owner or soul verifiers can mint to address
+     * - Only admin can mint
+     *
+     * @param to The address to mint the token to
+     * @param tokenId The token ID to mint
+     * @return bytes4 The function selector if successful
      */
     function mint(
-        address to_,
-        uint256 tokenId_
-    ) external onlyManager returns (bool) {
-        _mint(to_, tokenId_);
-        return true;
+        address to,
+        uint256 tokenId
+    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+        (uint256 decomposedTokenId, address pseudoOwner) = _decomposeTokenId(
+            tokenId
+        );
+        _mint(to == address(0) ? pseudoOwner : to, decomposedTokenId);
+        return MINT_SELECTOR;
     }
 
     /**
-     * @dev burn the token
+     * @dev Completes the token by transferring it to the fulfiller.
+     * @param fulfiller The address of the fulfiller
+     * @param tokenId The token ID to complete
+     */
+    function _complete(address fulfiller, uint256 tokenId) internal {
+        address from = super._ownerOf(tokenId);
+
+        if (from == address(0)) {
+            revert ERC721NonexistentToken(tokenId);
+        }
+
+        if (_completions[tokenId]) {
+            revert WishAlreadyCompleted(tokenId);
+        }
+
+        if (fulfiller == address(0) || fulfiller == from) {
+            revert WishInvalidAddress(fulfiller);
+        }
+
+        _completions[tokenId] = true;
+        _transfer(from, fulfiller, tokenId);
+
+        emit Completed(tokenId, fulfiller);
+    }
+
+    /**
+     * @dev Completes a token by transferring it to the fulfiller and returns the function selector if successful.
+     *
      *
      * Requirements:
      *
-     * - when the contract is not paused
-     * - only owner or soul verifiers can mint to address
+     * - Only admin can call the complete function
+     *
+     * @param fulfiller The address of the fulfiller
+     * @param tokenId The token ID to complete
+     * @return bytes4 The function selector if successful
      */
-    function burn(uint256 tokenId_) external onlyManager returns (bool) {
-        _burn(tokenId_);
-        return true;
+    function complete(
+        address fulfiller,
+        uint256 tokenId
+    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+        (uint256 decomposedTokenId, ) = _decomposeTokenId(tokenId);
+        _complete(fulfiller, decomposedTokenId);
+        return COMPLETE_SELECTOR;
     }
 
     /**
-     * @dev set the token completion state
+     * @dev Returns the completion status of the token.
+     * @param tokenId The token ID to get the completion status of
+     * @return The completion status of the token
+     */
+    function completions(uint256 tokenId) external view returns (bool) {
+        (uint256 decomposedTokenId, ) = _decomposeTokenId(tokenId);
+        return _completions[decomposedTokenId];
+    }
+
+    /**
+     * @dev Burns `tokenId` and returns the function selector if successful.
      *
      * Requirements:
      *
-     * - only owner or soul verifiers can mint to address
-     * - token has to be minted
+     * - Only admin can burn
+     * - Only non completed token can be burned
+     *
+     * @param tokenId The token ID to burn
+     * @return bytes4 The function selector if successful
      */
-    function setCompleted(
-        uint256 tokenId_,
-        bool status_
-    ) external onlyManager returns (bool) {
-        _requireMinted(tokenId_);
-        require(completed[tokenId_] != status_, WishError.SetCompletedError);
-
-        completed[tokenId_] = status_;
-        emit SetCompleted(tokenId_, status_);
-        return true;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // ─── Inherited Functions ─────────────────────────────────────────────────────
-
-    /**
-     * @dev See {ERC721-_beforeTokenTransfer}
-     */
-    function _beforeTokenTransfer(
-        address from_,
-        address to_,
-        uint256 tokenId_,
-        uint256 batchSize_
-    ) internal virtual override(ERC721Enumerable, ERC721Soulbound) {
-        super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
+    function burn(
+        uint256 tokenId
+    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+        (uint256 decomposedTokenId, ) = _decomposeTokenId(tokenId);
+        if (_completions[decomposedTokenId]) {
+            revert WishAlreadyCompleted(decomposedTokenId);
+        }
+        _burn(decomposedTokenId);
+        return BURN_SELECTOR;
     }
 
     /**
-     * @dev See {IERC165-supportsInterface}
+     * @dev Approves another address to transfer the given token ID.
+     * This function is disabled for this contract.
+     */
+    function approve(address, uint256) public virtual override(ERC721) {
+        revert WishFunctionDisabled();
+    }
+
+    /**
+     * @dev Gets the approved address for a token ID, or zero if no address set.
+     * @return The address currently approved for the given token ID
+     */
+    function getApproved(
+        uint256
+    ) public view virtual override(ERC721) returns (address) {
+        return address(0);
+    }
+
+    /**
+     * @dev Sets or unsets the approval of a given operator.
+     * This function is disabled for this contract.
+     */
+    function setApprovalForAll(address, bool) public virtual override(ERC721) {
+        revert WishFunctionDisabled();
+    }
+
+    /**
+     * @dev Tells whether an operator is approved by a given owner.
+     * @return A boolean value representing whether the given operator is approved by the given owner
+     */
+    function isApprovedForAll(
+        address,
+        address
+    ) public view virtual override(ERC721) returns (bool) {
+        return false;
+    }
+
+    /**
+     * @dev Transfers the ownership of a given token ID to another address.
+     * This function is disabled for this contract.
+     */
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public virtual override(ERC721) {
+        revert WishFunctionDisabled();
+    }
+
+    /**
+     * @dev Safely transfers the ownership of a given token ID to another address.
+     * This function is disabled for this contract.
+     */
+    function safeTransferFrom(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override(ERC721) {
+        revert WishFunctionDisabled();
+    }
+
+    /**
+     * @dev Indicates whether the contract implements an interface.
+     * @param interfaceId The interface identifier, as specified in ERC-165
+     * @return A boolean value that indicates whether the contract implements `interfaceId`
      */
     function supportsInterface(
-        bytes4 interfaceId_
-    )
-        public
-        view
-        virtual
-        override(ERC721Enumerable, ERC721Soulbound, IERC165)
-        returns (bool)
-    {
-        return
-            interfaceId_ == type(IWish).interfaceId ||
-            super.supportsInterface(interfaceId_);
+        bytes4 interfaceId
+    ) public view virtual override(ERC721, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
-
-    // ─────────────────────────────────────────────────────────────────────
 }
