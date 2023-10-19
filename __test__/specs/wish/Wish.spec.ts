@@ -8,7 +8,7 @@ import { generateInterfaceId } from "@test/utils/generateInterfaceId";
 import { IWish__factory } from "@/types/factories/contracts/wish/IWish__factory";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 
-describe.only("Wish", () => {
+describe("Wish", () => {
   async function deployWishFixture() {
     const [deployer, admin, user, user2, user3, user4] =
       await ethers.getSigners();
