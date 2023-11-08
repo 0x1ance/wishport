@@ -33,13 +33,9 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       allowUnlimitedContractSize: true,
-      gas: 2100000,
-      gasPrice: 8000000000,
     },
     localhost: {
       allowUnlimitedContractSize: true,
-      gas: 2100000,
-      gasPrice: 8000000000,
     },
     goerli: {
       url: `https://goerli.infura.io/v3/${env.INFURA_API_KEY}`,

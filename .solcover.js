@@ -1,12 +1,13 @@
 module.exports = {
   skipFiles: [
-    "mocks/TestERC20.sol",
-    "mocks/TestERC721.sol",
-    "mocks/TestUSDT.sol",
-    "mocks/TestTokenRecovery.sol",
-    "mocks/wish/MockWishAdmin.sol",
-    "utils/OptimizedMath.sol",
-    "utils/PortionCalculation.sol",
-    "utils/SignatureHelper.sol",
+    "mock/TestERC20.sol",
+    "mock/TestUSDT.sol",
+    "mock/ReverseTransferERC20.sol",
+    "mock/TestERC721.sol",
+    "mock/TestUSDT.sol",
+    "mock/TestTokenRecovery.sol",
+    "mock/wish/MockWishAdmin.sol",
+    "mock/wish/MockIncorrectWish.sol",
+    "mock/MockForwarder.sol",
   ],
 };

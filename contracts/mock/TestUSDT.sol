@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -12,10 +12,7 @@ contract TestUSDT is ERC20, Ownable {
 
     uint256 public constant MAX_uint256 = 2 ** 256 - 1;
 
-    constructor(
-        string memory name_,
-        string memory symbol_
-    ) ERC20(name_, symbol_) Ownable(_msgSender()) {}
+    constructor() ERC20("USDT", "USDT") Ownable(_msgSender()) {}
 
     function mint(address account, uint256 amount) external {
         _mint(account, amount);

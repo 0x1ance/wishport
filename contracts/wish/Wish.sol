@@ -2,12 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {TokenRecovery} from "../utils/TokenRecovery.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IWish} from "./IWish.sol";
 
@@ -26,13 +24,17 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
     string public baseURI;
 
     /// @dev Mapping from tokenId to completion status, true is completed
-    mapping(uint256 => bool) private _completions;
+    mapping(uint256 => bool) internal _completions;
 
     /// @dev Role for admin users
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes4 public constant MINT_SELECTOR = IWish.mint.selector;
     bytes4 public constant BURN_SELECTOR = IWish.burn.selector;
     bytes4 public constant COMPLETE_SELECTOR = IWish.complete.selector;
+    bytes4 private constant SAFE_TRANSFER_FROM_SELECTOR =
+        bytes4(
+            keccak256(bytes("safeTransferFrom(address,address,uint256,bytes)"))
+        );
 
     /**
      * @dev Initializes the contract by setting the metadata URIs, the initial admin, and granting roles.
@@ -147,7 +149,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
      */
     function ownerOf(
         uint256 tokenId
-    ) public view virtual override(ERC721) returns (address owner) {
+    ) public view virtual override(ERC721, IWish) returns (address owner) {
         (, owner) = _decomposeTokenId(tokenId);
     }
 
@@ -165,7 +167,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
     function mint(
         address to,
         uint256 tokenId
-    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+    ) external virtual onlyRole(ADMIN_ROLE) returns (bytes4) {
         (uint256 decomposedTokenId, address pseudoOwner) = _decomposeTokenId(
             tokenId
         );
@@ -181,16 +183,12 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
     function _complete(address fulfiller, uint256 tokenId) internal {
         address from = super._ownerOf(tokenId);
 
-        if (from == address(0)) {
-            revert ERC721NonexistentToken(tokenId);
-        }
-
         if (_completions[tokenId]) {
-            revert WishAlreadyCompleted(tokenId);
+            revert AlreadyCompleted(tokenId);
         }
 
-        if (fulfiller == address(0) || fulfiller == from) {
-            revert WishInvalidAddress(fulfiller);
+        if (fulfiller == from) {
+            revert InvalidAddress(fulfiller);
         }
 
         _completions[tokenId] = true;
@@ -214,7 +212,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
     function complete(
         address fulfiller,
         uint256 tokenId
-    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+    ) external virtual onlyRole(ADMIN_ROLE) returns (bytes4) {
         (uint256 decomposedTokenId, ) = _decomposeTokenId(tokenId);
         _complete(fulfiller, decomposedTokenId);
         return COMPLETE_SELECTOR;
@@ -243,10 +241,10 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
      */
     function burn(
         uint256 tokenId
-    ) external onlyRole(ADMIN_ROLE) returns (bytes4) {
+    ) external virtual onlyRole(ADMIN_ROLE) returns (bytes4) {
         (uint256 decomposedTokenId, ) = _decomposeTokenId(tokenId);
         if (_completions[decomposedTokenId]) {
-            revert WishAlreadyCompleted(decomposedTokenId);
+            revert AlreadyCompleted(decomposedTokenId);
         }
         _burn(decomposedTokenId);
         return BURN_SELECTOR;
@@ -257,7 +255,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
      * This function is disabled for this contract.
      */
     function approve(address, uint256) public virtual override(ERC721) {
-        revert WishFunctionDisabled();
+        revert FunctionDisabled(IERC721.approve.selector);
     }
 
     /**
@@ -275,7 +273,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
      * This function is disabled for this contract.
      */
     function setApprovalForAll(address, bool) public virtual override(ERC721) {
-        revert WishFunctionDisabled();
+        revert FunctionDisabled(IERC721.setApprovalForAll.selector);
     }
 
     /**
@@ -298,7 +296,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
         address,
         uint256
     ) public virtual override(ERC721) {
-        revert WishFunctionDisabled();
+        revert FunctionDisabled(IERC721.transferFrom.selector);
     }
 
     /**
@@ -311,7 +309,7 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
         uint256,
         bytes memory
     ) public virtual override(ERC721) {
-        revert WishFunctionDisabled();
+        revert FunctionDisabled(SAFE_TRANSFER_FROM_SELECTOR);
     }
 
     /**
@@ -324,4 +322,8 @@ contract Wish is ERC721, Ownable, AccessControl, TokenRecovery, IWish {
     ) public view virtual override(ERC721, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 }

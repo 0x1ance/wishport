@@ -2,21 +2,30 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { ContractDeployer } from "@test/utils/contract-deployer";
 import { faker } from "@faker-js/faker";
-import { IERC165__factory, IERC721__factory } from "@/types";
+import {
+  IAccessControl__factory,
+  IERC165__factory,
+  IERC721__factory,
+  Nonces__factory,
+} from "@/types";
 import { composeTokenId } from "@/utils/composeTokenId";
 import { generateInterfaceId } from "@test/utils/generateInterfaceId";
 import { IWish__factory } from "@/types/factories/contracts/wish/IWish__factory";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 
 describe("Wish", () => {
-  async function deployWishFixture() {
+  async function fixture() {
     const [deployer, admin, user, user2, user3, user4] =
       await ethers.getSigners();
     const contractURI = faker.internet.url();
     const baseURI = faker.internet.url();
 
+    const name = "Wish";
+    const symbol = "WISH";
     const [wish] = await ContractDeployer.Wish({
       deployer,
+      name_: name,
+      symbol_: symbol,
       admins: [admin.address],
       contractURI_: contractURI,
       uri_: baseURI,
@@ -32,12 +41,14 @@ describe("Wish", () => {
       user4,
       contractURI,
       baseURI,
+      name,
+      symbol,
     };
   }
 
   describe("Deployment", () => {
     it("should set the deployer as owner", async () => {
-      const { wish, deployer } = await loadFixture(deployWishFixture);
+      const { wish, deployer } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -46,7 +57,7 @@ describe("Wish", () => {
       expect(await wish.owner()).to.equal(deployer.address);
     });
     it("should set the contractURI", async () => {
-      const { wish, contractURI } = await loadFixture(deployWishFixture);
+      const { wish, contractURI } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -55,7 +66,7 @@ describe("Wish", () => {
       expect(await wish.contractURI()).to.equal(contractURI);
     });
     it("should set the baseURI", async () => {
-      const { wish, baseURI } = await loadFixture(deployWishFixture);
+      const { wish, baseURI } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -64,7 +75,7 @@ describe("Wish", () => {
       expect(await wish.baseURI()).to.equal(baseURI);
     });
     it("should set the DEFAULT_ADMIN_ROLE to deployer", async () => {
-      const { wish, deployer } = await loadFixture(deployWishFixture);
+      const { wish, deployer } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -78,7 +89,7 @@ describe("Wish", () => {
 
   describe("MINT_SELECTOR", () => {
     it("should return the function selector for mint", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const IWishInterface = IWish__factory.createInterface();
 
@@ -93,7 +104,7 @@ describe("Wish", () => {
 
   describe("BURN_SELECTOR", () => {
     it("should return the function selector for burn", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const IWishInterface = IWish__factory.createInterface();
 
@@ -106,9 +117,21 @@ describe("Wish", () => {
     });
   });
 
+  describe("name", () => {
+    it("should return the name", async () => {
+      const { wish, name } = await loadFixture(fixture);
+      // Arrange
+
+      // Act
+
+      // Assert
+      expect(await wish.name()).to.equal(name);
+    });
+  });
+
   describe("COMPLETE_SELECTOR", () => {
     it("should return the function selector for complete", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const IWishInterface = IWish__factory.createInterface();
 
@@ -123,7 +146,7 @@ describe("Wish", () => {
 
   describe("contractURI", () => {
     it("should return the contractURI", async () => {
-      const { wish, contractURI } = await loadFixture(deployWishFixture);
+      const { wish, contractURI } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -135,7 +158,7 @@ describe("Wish", () => {
 
   describe("setContractURI", () => {
     it("should set the contractURI", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const newContractURI = faker.internet.url();
 
@@ -146,7 +169,7 @@ describe("Wish", () => {
       expect(await wish.contractURI()).to.equal(newContractURI);
     });
     it("should throw error if caller is not admin", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const newContractURI = faker.internet.url();
 
@@ -161,7 +184,7 @@ describe("Wish", () => {
 
   describe("baseURI", () => {
     it("should return the baseURI", async () => {
-      const { wish, baseURI } = await loadFixture(deployWishFixture);
+      const { wish, baseURI } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -173,7 +196,7 @@ describe("Wish", () => {
 
   describe("setBaseURI", () => {
     it("should set the baseURI", async () => {
-      const { wish, deployer } = await loadFixture(deployWishFixture);
+      const { wish, deployer } = await loadFixture(fixture);
       // Arrange
       const newBaseURI = faker.internet.url();
 
@@ -184,7 +207,7 @@ describe("Wish", () => {
       expect(await wish.baseURI()).to.equal(newBaseURI);
     });
     it("should throw error if caller is not admin", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const newBaseURI = faker.internet.url();
 
@@ -199,7 +222,7 @@ describe("Wish", () => {
 
   describe("tokenURI", () => {
     it("should throw error if tokenId is less than or equals to 96 bits and has not been minted", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -211,9 +234,7 @@ describe("Wish", () => {
         .withArgs(tokenId);
     });
     it("should return the tokenURI if tokenId is less than or equals to 96 bits and has been minted", async () => {
-      const { wish, user, admin, baseURI } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, user, admin, baseURI } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -227,7 +248,7 @@ describe("Wish", () => {
       );
     });
     it("should return the tokenURI of the original token if tokenId is greater than 96 bits and has not been minted", async () => {
-      const { wish, user, baseURI } = await loadFixture(deployWishFixture);
+      const { wish, user, baseURI } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const pseudoOwnerAddress = user.address;
@@ -243,9 +264,7 @@ describe("Wish", () => {
     });
 
     it("should return the tokenURI of the original token if tokenId is greater than 96 bits and has been minted", async () => {
-      const { wish, user, admin, baseURI } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, user, admin, baseURI } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const pseudoOwnerAddress = user.address;
@@ -262,9 +281,7 @@ describe("Wish", () => {
     });
 
     it("should return empty string if baseURI is an empty string and the tokenId is less than or equals to 96 bits", async () => {
-      const { wish, admin, user, deployer } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, deployer } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -278,7 +295,7 @@ describe("Wish", () => {
     });
 
     it("should return empty string if baseURI is an empty string and the tokenId is greater than 96 bits", async () => {
-      const { wish, user, deployer } = await loadFixture(deployWishFixture);
+      const { wish, user, deployer } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const pseudoOwnerAddress = user.address;
@@ -295,7 +312,7 @@ describe("Wish", () => {
 
   describe("ownerOf", () => {
     it("should return the owner of the token", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -306,7 +323,7 @@ describe("Wish", () => {
       expect(await wish.ownerOf(tokenId)).to.equal(user.address);
     });
     it("should return the pseudo owner if the tokenId is greater than 96 bits and not minted", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const pseudoOwnerAddress = user.address;
@@ -318,7 +335,7 @@ describe("Wish", () => {
       expect(await wish.ownerOf(composedTokenId)).to.equal(pseudoOwnerAddress);
     });
     it("should return the actual owner if the tokenId is greater than 96 bits and minted", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -332,7 +349,7 @@ describe("Wish", () => {
       expect(await wish.ownerOf(composedTokenId)).to.equal(ownerAddress);
     });
     it("should return zero address if the tokenId is less than or equals to 96 bits and is not minted", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -342,7 +359,7 @@ describe("Wish", () => {
       expect(await wish.ownerOf(tokenId)).to.equal(ethers.ZeroAddress);
     });
     it("should return the actual owner if the tokenId is less than or equals to 96 bits and is minted", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -357,7 +374,7 @@ describe("Wish", () => {
 
   describe("mint", () => {
     it("should throw error if caller is not admin", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -368,7 +385,7 @@ describe("Wish", () => {
         .withArgs(user.address, await wish.ADMIN_ROLE());
     });
     it("should throw error if recipient is zero address and the tokenId is less than or equals to 96 bits", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const receiverAddress = ethers.ZeroAddress;
@@ -381,7 +398,7 @@ describe("Wish", () => {
         .withArgs(receiverAddress);
     });
     it("should mint 1 token to user", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
 
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
@@ -398,7 +415,7 @@ describe("Wish", () => {
       expect(await wish.ownerOf(tokenId)).to.equal(ownerAddress);
     });
     it("should mint the original token when the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
 
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
@@ -424,7 +441,7 @@ describe("Wish", () => {
       expect(composedOwnerAfter).to.equal(ownerAddress);
     });
     it("should mint the original token to the pseudo owner when the token is a composed tokenId and the recipient is zero address", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
 
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
@@ -450,7 +467,7 @@ describe("Wish", () => {
       expect(composedOwnerAfter).to.equal(pseudoOwnerAddress);
     });
     it("should throw error if the pseudo owner is zero address when the token is a composed tokenId and the recipient is zero address", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
 
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
@@ -466,12 +483,15 @@ describe("Wish", () => {
         .withArgs(receiverAddress);
     });
     it("should return the function selector for mint", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const [mockWishAdmin] = await ContractDeployer.Mock.MockWishAdmin(
         await wish.getAddress()
       );
-      wish.grantRole(await wish.ADMIN_ROLE(), await mockWishAdmin.getAddress());
+      await wish.grantRole(
+        await wish.ADMIN_ROLE(),
+        await mockWishAdmin.getAddress()
+      );
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
 
@@ -492,7 +512,7 @@ describe("Wish", () => {
 
   describe("complete", () => {
     it("should throw error if caller is not admin", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const fulfillerAddress = user.address;
@@ -505,7 +525,7 @@ describe("Wish", () => {
         .withArgs(user.address, await wish.ADMIN_ROLE());
     });
     it("should throw error if the token does not exist", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const fulfillerAddress = admin.address;
@@ -518,7 +538,7 @@ describe("Wish", () => {
         .withArgs(tokenId);
     });
     it("should throw error if the fulfiller is the token owner", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -529,11 +549,11 @@ describe("Wish", () => {
 
       // Assert
       await expect(wish.connect(admin).complete(fulfillerAddress, tokenId))
-        .to.be.revertedWithCustomError(wish, "WishInvalidAddress")
+        .to.be.revertedWithCustomError(wish, "InvalidAddress")
         .withArgs(ownerAddress);
     });
     it("should throw error if the fulfiller is a zero address", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -544,11 +564,11 @@ describe("Wish", () => {
 
       // Assert
       await expect(wish.connect(admin).complete(fulfillerAddress, tokenId))
-        .to.be.revertedWithCustomError(wish, "WishInvalidAddress")
+        .to.be.revertedWithCustomError(wish, "ERC721InvalidReceiver")
         .withArgs(ethers.ZeroAddress);
     });
     it("should throw error if the token is completed", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -561,11 +581,11 @@ describe("Wish", () => {
 
       // Assert
       await expect(wish.connect(admin).complete(fulfillerAddress, tokenId))
-        .to.be.revertedWithCustomError(wish, "WishAlreadyCompleted")
+        .to.be.revertedWithCustomError(wish, "AlreadyCompleted")
         .withArgs(tokenId);
     });
     it("should set the token completion status to true", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -582,9 +602,7 @@ describe("Wish", () => {
       expect(after).to.be.true;
     });
     it("should set the completion status of the original token to true if the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2, user3 } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, user2, user3 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -607,7 +625,7 @@ describe("Wish", () => {
       expect(composedAfter).to.be.true;
     });
     it("should transfer the token from the owner to the fulfiller", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -624,9 +642,7 @@ describe("Wish", () => {
       expect(after).to.equal(fulfillerAddress);
     });
     it("should transfer the token from the actual owner to the fulfiller if the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2, user3 } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, user2, user3 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -645,7 +661,7 @@ describe("Wish", () => {
       expect(after).to.equal(fulfillerAddress);
     });
     it('should emit a "Transfer" event', async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -665,7 +681,7 @@ describe("Wish", () => {
         .withArgs(ownerAddress, fulfillerAddress, tokenId);
     });
     it('should emit a "Completed" event', async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -685,7 +701,7 @@ describe("Wish", () => {
         .withArgs(tokenId, fulfillerAddress);
     });
     it("should return the function selector for complete", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const [mockWishAdmin] = await ContractDeployer.Mock.MockWishAdmin(
         await wish.getAddress()
@@ -714,7 +730,7 @@ describe("Wish", () => {
 
   describe("completions", () => {
     it("should return false if the token has not been completed", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -728,7 +744,7 @@ describe("Wish", () => {
       expect(before).to.be.false;
     });
     it("should return true if the token has been completed", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -746,9 +762,7 @@ describe("Wish", () => {
       expect(after).to.be.true;
     });
     it("should return true if the token has been completed and the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2, user3 } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, user2, user3 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -771,9 +785,7 @@ describe("Wish", () => {
       expect(composedAfter).to.be.true;
     });
     it("should return false if the token has not been completed and the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2, user3 } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, user2, user3 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -794,7 +806,7 @@ describe("Wish", () => {
 
   describe("burn", () => {
     it("should throw error if caller is not admin", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -805,7 +817,7 @@ describe("Wish", () => {
         .withArgs(user.address, await wish.ADMIN_ROLE());
     });
     it("should throw error if the token has been completed", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -817,13 +829,11 @@ describe("Wish", () => {
 
       // Assert
       await expect(wish.connect(admin).burn(tokenId))
-        .to.be.revertedWithCustomError(wish, "WishAlreadyCompleted")
+        .to.be.revertedWithCustomError(wish, "AlreadyCompleted")
         .withArgs(tokenId);
     });
     it("should throw error if the original token has been completed and the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2, user3 } = await loadFixture(
-        deployWishFixture
-      );
+      const { wish, admin, user, user2, user3 } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -837,11 +847,11 @@ describe("Wish", () => {
 
       // Assert
       await expect(wish.connect(admin).burn(composedTokenId))
-        .to.be.revertedWithCustomError(wish, "WishAlreadyCompleted")
+        .to.be.revertedWithCustomError(wish, "AlreadyCompleted")
         .withArgs(tokenId);
     });
     it("should throw error if the token does not exist", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -852,8 +862,22 @@ describe("Wish", () => {
         .to.be.revertedWithCustomError(wish, "ERC721NonexistentToken")
         .withArgs(tokenId);
     });
+    it("should throw error if the token is a composed tokenId and the original token does not exist", async () => {
+      const { wish, admin, user } = await loadFixture(fixture);
+      // Arrange
+      const tokenId = 1;
+      const ownerAddress = user.address;
+      const composedTokenId = composeTokenId(ownerAddress, tokenId);
+
+      // Act
+
+      // Assert
+      await expect(wish.connect(admin).burn(composedTokenId))
+        .to.be.revertedWithCustomError(wish, "ERC721NonexistentToken")
+        .withArgs(tokenId);
+    });
     it("should burn the token", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -869,7 +893,7 @@ describe("Wish", () => {
       expect(after).to.equal(0);
     });
     it("should burn the original token if the token is a composed tokenId", async () => {
-      const { wish, admin, user, user2 } = await loadFixture(deployWishFixture);
+      const { wish, admin, user, user2 } = await loadFixture(fixture);
       // Arrange
       const tokenId = 1;
       const ownerAddress = user.address;
@@ -891,7 +915,7 @@ describe("Wish", () => {
       expect(composedAfter).to.equal(0);
     });
     it('should emit a "Transfer" event', async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = 1;
       const ownerAddress = user.address;
@@ -910,7 +934,7 @@ describe("Wish", () => {
         .withArgs(ownerAddress, ethers.ZeroAddress, tokenId);
     });
     it("should return the function selector for burn", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const [mockWishAdmin] = await ContractDeployer.Mock.MockWishAdmin(
         await wish.getAddress()
@@ -937,32 +961,34 @@ describe("Wish", () => {
 
   describe("approve", () => {
     it("should throw error if anyone calls this function", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
       // Assert
       await expect(wish.connect(user).approve(user.address, 1))
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("approve").selector);
     });
     it("should throw error if admin calls this function", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
       // Assert
       await expect(wish.connect(admin).approve(admin.address, 1))
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("approve").selector);
     });
   });
 
   describe("getApproved", () => {
     it("should return a zero address if the tokenId is less than or equals to 96 bits and the token is not minted", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
@@ -973,7 +999,7 @@ describe("Wish", () => {
       expect(response).to.equal(ethers.ZeroAddress);
     });
     it("should return a zero address if the tokenId is less than or equals to 96 bits and the token is minted", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = 1;
       const ownerAddress = user.address;
@@ -986,7 +1012,7 @@ describe("Wish", () => {
       expect(response).to.equal(ethers.ZeroAddress);
     });
     it("should return a zero address if the tokenId is greater than 96 bits and the token is not minted", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const pseudoOwnerAddress = user.address;
@@ -999,7 +1025,7 @@ describe("Wish", () => {
       expect(response).to.equal(ethers.ZeroAddress);
     });
     it("should return a zero address if the tokenId is greater than 96 bits and the token is minted", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const tokenId = faker.number.int({ min: 1, max: 1000 });
       const ownerAddress = user.address;
@@ -1017,32 +1043,34 @@ describe("Wish", () => {
 
   describe("setApprovalForAll", () => {
     it("should throw error if anyone calls this function", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
       // Assert
       await expect(wish.connect(user).setApprovalForAll(user.address, true))
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("setApprovalForAll").selector);
     });
     it("should throw error if admin calls this function", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
       // Assert
       await expect(wish.connect(admin).setApprovalForAll(admin.address, true))
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("setApprovalForAll").selector);
     });
   });
 
   describe("isApprovedForAll", () => {
     it("should return false for all circumstances", async () => {
-      const { wish, admin, user } = await loadFixture(deployWishFixture);
+      const { wish, admin, user } = await loadFixture(fixture);
       // Arrange
       const operatorAddress = user.address;
 
@@ -1059,8 +1087,9 @@ describe("Wish", () => {
 
   describe("transferFrom", () => {
     it("should throw error if anyone calls this function", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
@@ -1068,12 +1097,13 @@ describe("Wish", () => {
       await expect(
         wish.connect(user).transferFrom(user.address, user.address, 1)
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("transferFrom").selector);
     });
     it("should throw error if admin calls this function", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
 
       // Act
 
@@ -1081,15 +1111,16 @@ describe("Wish", () => {
       await expect(
         wish.connect(admin).transferFrom(admin.address, admin.address, 1)
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(IERC721Interface.getFunction("transferFrom").selector);
     });
   });
 
   describe("safeTransferFrom(address,address,uint256)", () => {
     it("should throw error if anyone calls this function", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
       // Act
@@ -1104,12 +1135,17 @@ describe("Wish", () => {
             tokenId
           )
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(
+          IERC721Interface.getFunction(
+            "safeTransferFrom(address,address,uint256,bytes)"
+          ).selector
+        );
     });
     it("should throw error if admin calls this function", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
       // Act
@@ -1124,15 +1160,20 @@ describe("Wish", () => {
             tokenId
           )
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(
+          IERC721Interface.getFunction(
+            "safeTransferFrom(address,address,uint256,bytes)"
+          ).selector
+        );
     });
   });
 
   describe("safeTransferFrom(address,address,uint256,bytes)", () => {
     it("should throw error if anyone calls this function", async () => {
-      const { wish, user } = await loadFixture(deployWishFixture);
+      const { wish, user } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
       // Act
@@ -1148,12 +1189,17 @@ describe("Wish", () => {
             "0x"
           )
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(
+          IERC721Interface.getFunction(
+            "safeTransferFrom(address,address,uint256,bytes)"
+          ).selector
+        );
     });
     it("should throw error if admin calls this function", async () => {
-      const { wish, admin } = await loadFixture(deployWishFixture);
+      const { wish, admin } = await loadFixture(fixture);
       // Arrange
+      const IERC721Interface = IERC721__factory.createInterface();
       const tokenId = faker.number.int({ min: 1, max: 1000 });
 
       // Act
@@ -1169,14 +1215,18 @@ describe("Wish", () => {
             "0x"
           )
       )
-        .to.be.revertedWithCustomError(wish, "WishFunctionDisabled")
-        .withArgs();
+        .to.be.revertedWithCustomError(wish, "FunctionDisabled")
+        .withArgs(
+          IERC721Interface.getFunction(
+            "safeTransferFrom(address,address,uint256,bytes)"
+          ).selector
+        );
     });
   });
 
   describe("supportsInterface", () => {
     it("should supportsInterface for ERC165", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const IERC165Interface = IERC165__factory.createInterface();
       const IERC165InterfaceId = generateInterfaceId([IERC165Interface]);
@@ -1187,7 +1237,7 @@ describe("Wish", () => {
       expect(await wish.supportsInterface(IERC165InterfaceId)).to.be.true;
     });
     it("should supportsInterface for IERC721", async () => {
-      const { wish } = await loadFixture(deployWishFixture);
+      const { wish } = await loadFixture(fixture);
       // Arrange
       const IERC721Interface = IERC721__factory.createInterface();
       const IERC165Interface = IERC165__factory.createInterface();
@@ -1200,6 +1250,67 @@ describe("Wish", () => {
 
       // Assert
       expect(await wish.supportsInterface(IERC721InterfaceId)).to.be.true;
+    });
+    it("should supportsInterface for AccessControl", async () => {
+      const { wish } = await loadFixture(fixture);
+      // Arrange
+      const AccessControlInterface = IAccessControl__factory.createInterface();
+      const AccessControlInterfaceId = generateInterfaceId([
+        AccessControlInterface,
+      ]);
+
+      // Act
+
+      // Assert
+      expect(await wish.supportsInterface(AccessControlInterfaceId)).to.be.true;
+    });
+  });
+
+  describe("receive", () => {
+    it("should be able to receive ether", async () => {
+      const { wish, user } = await loadFixture(fixture);
+      // Arrange
+      const amount = faker.number.float({ min: 0.1, max: 1 });
+      const value = ethers.parseEther(amount.toString());
+
+      // Act
+      const before = await ethers.provider.getBalance(await wish.getAddress());
+      const tx = await user.sendTransaction({
+        to: await wish.getAddress(),
+        value,
+      });
+      await tx.wait();
+      const after = await ethers.provider.getBalance(await wish.getAddress());
+
+      // Assert
+      expect(before).to.be.lt(after);
+      expect(after).to.be.eq(before + value);
+    });
+  });
+  describe("fallback", () => {
+    it("should be able to receive ether", async () => {
+      const { wish, user } = await loadFixture(fixture);
+      // Arrange
+      const amount = faker.number.float({ min: 0.1, max: 1 });
+      const value = ethers.parseEther(amount.toString());
+      const NonceInterface = Nonces__factory.createInterface();
+      const createFakeTxData = NonceInterface.encodeFunctionData("nonces", [
+        user.address,
+      ]);
+
+      // Act
+      const before = await ethers.provider.getBalance(await wish.getAddress());
+      const tx = await user.sendTransaction({
+        to: await wish.getAddress(),
+        value,
+        data: createFakeTxData,
+      });
+      await tx.wait();
+      const after = await ethers.provider.getBalance(await wish.getAddress());
+
+      // Assert
+      expect(before).to.be.lt(after);
+      expect(after).to.be.eq(before + value);
     });
   });
 });
