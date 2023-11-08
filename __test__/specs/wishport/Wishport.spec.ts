@@ -3375,12 +3375,12 @@ describe.only("Wishport", () => {
 
       // Act
       const verification = await forwarder.verify({
-        ...ForwardRequestData,
+        ...metatx.message,
         signature: metatxSignature,
       });
       const before = await wishport.authedSigner();
       const tx = await forwarder.connect(relayer).execute({
-        ...ForwardRequestData,
+        ...metatx.message,
         signature: metatxSignature,
       });
       await tx.wait();
