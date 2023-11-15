@@ -16,7 +16,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { shouldBehaveLikeTokenRecovery } from "../patterns/utils/TokenRecovery/shouldBehaveLikeTokenRecovery";
 import { shouldBehaveLikeOwnable } from "../patterns/utils/TokenRecovery/shouldBehaveLikeOwnable";
 
-describe.only("Wishport", () => {
+describe("Wishport", () => {
   async function fixture() {
     const [deployer, admin, authedSigner, relayer, user, user2, user3, user4] =
       await ethers.getSigners();
@@ -1324,6 +1324,66 @@ describe.only("Wishport", () => {
       // Assert
       expect(after).to.equal(before + 1n);
     });
+    it('should revert if the feePortion is greater than the "BASE_PORTION"', async () => {
+      const { wishport, user, erc20, authedSigner } = await loadFixture(
+        fixture
+      );
+      // Arrange
+      const invalidFeePortion = (await wishport.BASE_PORTION()) + 1n;
+      const IWishportInterface = IWishport__factory.createInterface();
+      const tokenId = faker.number.int({ min: 1, max: 1000000 });
+
+      const rewardAmount = faker.number.float({
+        min: 0,
+        max: 1000,
+        precision: 0.01,
+      });
+      await quickList({
+        wishport,
+        user,
+        erc20,
+        tokenId,
+        authedSigner,
+        rewardAmount,
+      });
+
+      const deadline = Math.floor(faker.date.future().getTime() / 1000);
+      const signature = await generateSignature({
+        signer: authedSigner,
+        types: [
+          "uint256",
+          "address",
+          "bytes4",
+          "address",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+        ],
+        values: [
+          (await ethers.provider.getNetwork()).chainId,
+          await wishport.getAddress(),
+          IWishportInterface.getFunction("unlist").selector,
+          user.address,
+          deadline,
+          tokenId,
+          invalidFeePortion,
+          await wishport.nonces(user.address),
+        ],
+      });
+
+      // Act
+
+      // Assert
+      await expect(
+        wishport
+          .connect(user)
+          .unlist(tokenId, invalidFeePortion, deadline, signature)
+      )
+        .to.be.revertedWithCustomError(wishport, "InvalidPortion")
+        .withArgs(invalidFeePortion);
+    });
+
     it("should emit a Unlisted event", async () => {
       const { wishport, user, erc20, authedSigner } = await loadFixture(
         fixture
@@ -2444,6 +2504,167 @@ describe.only("Wishport", () => {
       // Assert
       expect(after).to.equal(before + 1n);
     });
+    it('should revert if the feePortion is greater than the "BASE_PORTION"', async () => {
+      const { wishport, user, authedSigner, erc20, user2 } = await loadFixture(
+        fixture
+      );
+      // Arrange
+      const IWishportInterface = IWishport__factory.createInterface();
+      const fulfiller = user2;
+      const tokenId = faker.number.int({ min: 1, max: 1000000 });
+
+      const rewardAmount = faker.number.float({
+        min: 0,
+        max: 1000,
+        precision: 0.01,
+      });
+
+      await quickList({
+        wishport,
+        user,
+        erc20,
+        tokenId,
+        authedSigner,
+        rewardAmount,
+      });
+
+      const deadline = Math.floor(faker.date.future().getTime() / 1000);
+
+      const feePercentile = faker.number.bigInt({ min: 0n, max: 20n });
+      const invalidFeePortion = (await wishport.BASE_PORTION()) + 1n;
+      const refundPercentile = faker.number.bigInt({
+        min: 0n,
+        max: 100n - feePercentile,
+      });
+      const refundPortion = await computePortion({
+        target: await wishport.BASE_PORTION(),
+        percentile: refundPercentile,
+      });
+
+      const signature = await generateSignature({
+        signer: authedSigner,
+        types: [
+          "uint256",
+          "address",
+          "bytes4",
+          "address",
+          "uint256",
+          "uint256",
+          "address",
+          "uint256",
+          "uint256",
+          "uint256",
+        ],
+        values: [
+          (await ethers.provider.getNetwork()).chainId,
+          await wishport.getAddress(),
+          IWishportInterface.getFunction("fulfill").selector,
+          fulfiller.address,
+          deadline,
+          tokenId,
+          fulfiller.address,
+          refundPortion,
+          invalidFeePortion,
+          await wishport.nonces(fulfiller.address),
+        ],
+      });
+
+      // Act
+      const tx = wishport
+        .connect(fulfiller)
+        .fulfill(
+          tokenId,
+          fulfiller.address,
+          refundPortion,
+          invalidFeePortion,
+          deadline,
+          signature
+        );
+
+      // Assert
+      await expect(tx)
+        .to.be.revertedWithCustomError(wishport, "InvalidPortion")
+        .withArgs(invalidFeePortion);
+    });
+
+    it('should revert if the refundPortion is greater than the "BASE_PORTION"', async () => {
+      const { wishport, user, authedSigner, erc20, user2 } = await loadFixture(
+        fixture
+      );
+      // Arrange
+      const IWishportInterface = IWishport__factory.createInterface();
+      const fulfiller = user2;
+      const tokenId = faker.number.int({ min: 1, max: 1000000 });
+
+      const rewardAmount = faker.number.float({
+        min: 0,
+        max: 1000,
+        precision: 0.01,
+      });
+
+      await quickList({
+        wishport,
+        user,
+        erc20,
+        tokenId,
+        authedSigner,
+        rewardAmount,
+      });
+
+      const deadline = Math.floor(faker.date.future().getTime() / 1000);
+
+      const invalidRefundPortion = (await wishport.BASE_PORTION()) + 1n;
+      const feePercentile = faker.number.bigInt({ min: 0n, max: 20n });
+      const feePortion = await computePortion({
+        target: await wishport.BASE_PORTION(),
+        percentile: feePercentile,
+      });
+
+      const signature = await generateSignature({
+        signer: authedSigner,
+        types: [
+          "uint256",
+          "address",
+          "bytes4",
+          "address",
+          "uint256",
+          "uint256",
+          "address",
+          "uint256",
+          "uint256",
+          "uint256",
+        ],
+        values: [
+          (await ethers.provider.getNetwork()).chainId,
+          await wishport.getAddress(),
+          IWishportInterface.getFunction("fulfill").selector,
+          fulfiller.address,
+          deadline,
+          tokenId,
+          fulfiller.address,
+          invalidRefundPortion,
+          feePortion,
+          await wishport.nonces(fulfiller.address),
+        ],
+      });
+
+      // Act
+      const tx = wishport
+        .connect(fulfiller)
+        .fulfill(
+          tokenId,
+          fulfiller.address,
+          invalidRefundPortion,
+          feePortion,
+          deadline,
+          signature
+        );
+
+      // Assert
+      await expect(tx)
+        .to.be.revertedWithCustomError(wishport, "InvalidPortion")
+        .withArgs(invalidRefundPortion);
+    });
     it('should emit a "Fulfilled" event', async () => {
       const { wishport, user, authedSigner, erc20, user2 } = await loadFixture(
         fixture
@@ -2738,7 +2959,7 @@ describe.only("Wishport", () => {
         percentile: 12n,
       });
       const refundPercentile = 15n;
-      const refundPortion = await computePortion({
+      const refundPortion = computePortion({
         target: await wishport.BASE_PORTION(),
         percentile: refundPercentile,
       });
@@ -3362,7 +3583,6 @@ describe.only("Wishport", () => {
         },
         message: ForwardRequestData,
       };
-      await forwarder.eip712Domain();
 
       // sign metatransaction data
       const metatxSignature = await caller.signTypedData(
@@ -3393,8 +3613,7 @@ describe.only("Wishport", () => {
       expect(before).to.be.eq(authedSigner.address);
     });
     describe("trustedForwarder", async () => {
-      const { wishport, authedSigner, forwarder, deployer, relayer } =
-        await loadFixture(fixture);
+      const { wishport, forwarder } = await loadFixture(fixture);
       // Arrange
 
       // Act
@@ -3436,46 +3655,15 @@ describe.only("Wishport", () => {
 
   describe("Behaviours", () => {
     const tokenRecoveryBehaviourFixture = async () => {
-      const [deployer, authedSigner] = await ethers.getSigners();
+      const { wishport } = await fixture();
 
-      const [wish] = await ContractDeployer.Wish({
-        deployer,
-        admins: [],
-        contractURI_: faker.internet.url(),
-        uri_: faker.internet.url(),
-      });
-
-      const [mockForwarder] = await ContractDeployer.Mock.MockForwarder();
-
-      const [wishport] = await ContractDeployer.Wishport({
-        deployer,
-        wish_: await wish.getAddress(),
-        authedSigner_: authedSigner.address,
-        trustedForwarder_: await mockForwarder.getAddress(),
-      });
       return wishport;
     };
 
     shouldBehaveLikeTokenRecovery(tokenRecoveryBehaviourFixture);
 
     const ownableBehaviourFixture = async () => {
-      const [deployer, authedSigner, newOwner] = await ethers.getSigners();
-
-      const [wish] = await ContractDeployer.Wish({
-        deployer,
-        admins: [],
-        contractURI_: faker.internet.url(),
-        uri_: faker.internet.url(),
-      });
-
-      const [mockForwarder] = await ContractDeployer.Mock.MockForwarder();
-
-      const [wishport] = await ContractDeployer.Wishport({
-        deployer,
-        wish_: await wish.getAddress(),
-        authedSigner_: authedSigner.address,
-        trustedForwarder_: await mockForwarder.getAddress(),
-      });
+      const { wishport, deployer, user: newOwner } = await fixture();
       return { target: wishport, owner: deployer, newOwner };
     };
 

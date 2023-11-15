@@ -17,9 +17,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../wish/IWish.sol";
 import "./IWishport.sol";
 
-// TODO: remove test contracts
-import "hardhat/console.sol";
-
 /**
  * @title Wishport Contract
  * @dev The contract handles the listing, unlisting, and fulfillment of wishes.
@@ -183,7 +180,7 @@ contract Wishport is
         uint256 amount_,
         uint256 deadline,
         bytes calldata signature
-    ) external payable {
+    ) external payable nonReentrant {
         address operator = _msgSender();
         _checkSignature(
             authedSigner,
@@ -368,7 +365,7 @@ contract Wishport is
         internal
         view
         override(Context, ERC2771Context)
-        returns (address)
+        returns (address sender)
     {
         return ERC2771Context._msgSender();
     }
@@ -377,9 +374,9 @@ contract Wishport is
         internal
         view
         override(Context, ERC2771Context)
-        returns (bytes calldata)
+        returns (bytes calldata data)
     {
-        return ERC2771Context._msgData();
+        data = ERC2771Context._msgData();
     }
 
     receive() external payable {}
