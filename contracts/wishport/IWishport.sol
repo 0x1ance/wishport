@@ -1,84 +1,67 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.17;
-pragma experimental ABIEncoderV2;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
-// access control
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
-enum WishStatusEnum {
-    INACTIVE,
-    OUTSTANDING,
-    IN_PROGRESS,
-    COMPLETED
-}
-
-interface IWishport is IERC165 {
-    struct PortConfig {
-        uint256 MINIMUM_REWARD;
-        // PLATFORM_FEE_PORTION: e.g. 250_000_000 for 25% in uint256 basis points (parts per 1_000_000_000)
-        uint256 PLATFORM_FEE_PORTION;
-        uint256 DISPUTE_HANDLING_FEE_PORTION;
-        address PLATFORM_FEE_POOL;
+interface IWishport {
+    /// @notice The struct of wish
+    struct Wish {
+        address reward;
+        uint256 amount;
     }
 
-    /**
-     * @dev return the port config
-     */
-    function getPortConfig() external view returns (PortConfig memory);
+    event Listed(
+        uint256 indexed tokenId,
+        address indexed creator,
+        address indexed reward,
+        uint256 amount
+    );
+    event Unlisted(
+        uint256 indexed tokenId,
+        address indexed creator,
+        address indexed reward,
+        uint256 refund,
+        uint256 fee
+    );
+    event Fulfilled(
+        uint256 indexed tokenId,
+        address indexed fulfiller,
+        address indexed reward,
+        uint256 netAmount,
+        uint256 refund,
+        uint256 fee
+    );
 
-    /**
-     * @dev Set the port config
-     *
-     * Requirements:
-     *
-     * - caller must be the owner
-     */
-    function setPortConfig(PortConfig memory config_) external;
+    /// @dev Error to show when the address is invalid
+    error InvalidAddress(address account);
+    /// @dev Error to show when the portion is invalid
+    error InvalidPortion(uint256 portion);
+    /// @dev Error to show when the signer is invalid
+    error InvalidSigner();
+    error InsufficientEther(uint256 amount);
+    error FailedWishOperation(uint256 tokenId);
+    error ExpiredSignature(uint256 deadline);
+    error UnauthorizedAccess(address account);
 
-    /**
-     * @dev return true if the address is a manager
-     */
-    function isManager(address a_) external view returns (bool);
+    function list(
+        uint256 tokenId,
+        address reward,
+        uint256 amount,
+        uint256 deadline,
+        bytes calldata signature
+    ) external payable;
 
-    /**
-     * @dev Set the manager role
-     *
-     * Requirements:
-     *
-     * - caller must be the owner
-     */
-    function setManager(address a_, bool status_) external;
+    function unlist(
+        uint256 tokenId,
+        uint256 chargePortion,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
 
-    /**
-     * @dev return the currentNonce of an address
-     *
-     */
-    function hasNonceConsumed(
-        address a_,
-        uint256 nonce_
-    ) external view returns (bool);
-
-    /**
-     * @dev return supported erc20 of corresponding asset index
-     */
-    function getSupportedERC20ByIdx(
-        uint256 assetIdx_
-    ) external view returns (address);
-
-    /**
-     * @dev return all supported erc20 of corresponding asset index
-     */
-    function getSupportedERC20s() external view returns (address[] memory);
-
-    /**
-     * @dev register supported asset, increment supported erc20 count
-     *
-     * Requirements:
-     *
-     * - caller must be the owner
-     * - asset must implement IERC20 interface
-     */
-    function registerSupportedAsset(address a_) external;
+    function fulfill(
+        uint256 tokenId,
+        address fulfiller,
+        uint256 refundPortion,
+        uint256 feePortion,
+        uint256 deadline,
+        bytes calldata signature
+    ) external;
 }

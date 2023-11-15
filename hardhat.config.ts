@@ -1,24 +1,30 @@
-import { HardhatUserConfig } from 'hardhat/config'
-import '@nomicfoundation/hardhat-toolbox'
-import '@nomiclabs/hardhat-ethers'
-import '@typechain/hardhat'
-import 'hardhat-deploy'
-import 'hardhat-gas-reporter'
-import { env } from './environment'
+import { HardhatUserConfig } from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox";
+import "@typechain/hardhat";
+import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
+import "hardhat-deploy";
+import "hardhat-gas-reporter";
+import "solidity-coverage";
+import { env } from "./environment";
+import "tsconfig-paths/register";
 
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.17',
+        version: "0.8.20",
         settings: {
           optimizer: {
             enabled: true,
             runs: 200,
+            details: {
+              yul: true,
+            },
           },
-          viaIR: true
+          // viaIR: true,
         },
-      }
+      },
     ],
   },
   namedAccounts: {
@@ -27,13 +33,9 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       allowUnlimitedContractSize: true,
-      gas: 2100000,
-      gasPrice: 8000000000,
     },
     localhost: {
       allowUnlimitedContractSize: true,
-      gas: 2100000,
-      gasPrice: 8000000000,
     },
     goerli: {
       url: `https://goerli.infura.io/v3/${env.INFURA_API_KEY}`,
@@ -42,31 +44,31 @@ const config: HardhatUserConfig = {
         : {}),
     },
     bsc_testnet: {
-      url: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
       chainId: 97,
       gasPrice: 20000000000,
       ...(env.ROOT_WALLET_PRIVATE_KEY
         ? { accounts: [env.ROOT_WALLET_PRIVATE_KEY] }
         : {}),
-      tags: ['dev'],
+      tags: ["dev"],
     },
   },
   paths: {
-    sources: './contracts',
-    tests: './__test__/specs',
-    cache: './cache',
-    artifacts: './artifacts',
+    sources: "./contracts",
+    tests: "./__test__/specs",
+    cache: "./cache",
+    artifacts: "./artifacts",
   },
   typechain: {
-    outDir: './types',
-    target: 'ethers-v5',
+    outDir: "./types",
+    target: "ethers-v6",
     alwaysGenerateOverloads: false,
-    externalArtifacts: ['externalArtifacts/*.json'],
+    externalArtifacts: ["externalArtifacts/*.json"],
     dontOverrideCompile: false,
   },
   gasReporter: {
     enabled: true,
   },
-}
+};
 
-export default config
+export default config;
