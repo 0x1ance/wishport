@@ -194,15 +194,13 @@ contract Wishport is
                     tokenId,
                     reward,
                     amount_,
-                    nonces(operator)
+                    // consume user nonce
+                    _useNonce(operator)
                 )
             ).toEthSignedMessageHash(),
             signature,
             deadline
         );
-
-        // consume user nonce
-        _useNonce(operator);
 
         uint256 amount;
         if (reward == address(0)) {
@@ -253,7 +251,8 @@ contract Wishport is
                     deadline,
                     tokenId,
                     feePortion,
-                    nonces(operator)
+                    // consume user nonce
+                    _useNonce(operator)
                 )
             ).toEthSignedMessageHash(),
             signature,
@@ -264,9 +263,6 @@ contract Wishport is
         if (operator != WISH.ownerOf(tokenId)) {
             revert IERC721Errors.ERC721InvalidOwner(operator);
         }
-
-        // consume user nonce
-        _useNonce(operator);
 
         // remove the wish record
         Wish storage wish = wishes[tokenId];
@@ -312,7 +308,8 @@ contract Wishport is
                     fulfiller,
                     refundPortion,
                     feePortion,
-                    nonces(operator)
+                    // consume user nonce
+                    _useNonce(operator)
                 )
             ).toEthSignedMessageHash(),
             signature,
@@ -328,9 +325,6 @@ contract Wishport is
         if (operator != creator && operator != fulfiller) {
             revert UnauthorizedAccess(operator);
         }
-
-        // consume user nonce
-        _useNonce(operator);
 
         // calculate the fee and net reward amount
         Wish storage wish = wishes[tokenId];
